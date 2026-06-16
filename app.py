@@ -1,15 +1,13 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-import io
 from dataclasses import dataclass
 from typing import List, Dict
 
 # ------------------------------------------------------------
-# 1. Core simulation engine (same as Colab version)
+# Core simulation engine (unchanged)
 # ------------------------------------------------------------
 @dataclass
 class CycleRecord:
@@ -118,73 +116,58 @@ class Simulation:
         return self.agents[idx]
 
 # ------------------------------------------------------------
-# 2. Data loading and processing
+# Data processing functions (corrected)
 # ------------------------------------------------------------
-@st.cache_data
-def load_data(survey_file, metadata_file):
-    if survey_file is not None:
-        survey_df = pd.read_csv(survey_file)
-    else:
-        survey_df = None
-    if metadata_file is not None:
-        metadata_df = pd.read_csv(metadata_file)
-    else:
-        metadata_df = None
-    return survey_df, metadata_df
-
 def process_survey(survey_df):
+    """Returns (survey_df, school_info, error_message)"""
     if survey_df is None:
-        return None, None, None
-    # Ensure required columns
-    if 'school_id_no' not in survey_df.columns:
-        if 'school_id' in survey_df.columns:
-            survey_df['school_id_no'] = survey_df['school_id'].astype(str).apply(lambda x: int(x.split('_')[-1]) if '_' in x else int(x))
-        else:
-            st.error("Survey file must contain 'school_id_no' or 'school_id' column")
-            return None, None, None
-    if 'school_name' not in survey_df.columns:
-        survey_df['school_name'] = survey_df['school_id_no'].apply(lambda x: f"School_{x}")
-    def month_str_to_num(month_str):
-        try:
-            year = int(month_str[:4])
-            month = int(month_str[5:])
-            return (year - 2026) * 12 + month
-        except:
-            return 0
-    survey_df['month_num'] = survey_df['month'].apply(month_str_to_num)
-    school_info = survey_df[['school_id_no', 'school_name']].drop_duplicates().sort_values('school_id_no')
-    return survey_df, school_info
+        return None, None, "No survey file uploaded."
+    try:
+        # Ensure required columns
+        if 'school_id_no' not in survey_df.columns:
+            if 'school_id' in survey_df.columns:
+                survey_df['school_id_no'] = survey_df['school_id'].astype(str).apply(lambda x: int(x.split('_')[-1]) if '_' in x else int(x))
+            else:
+                return None, None, "Survey file must contain 'school_id_no' or 'school_id' column."
+        if 'school_name' not in survey_df.columns:
+            survey_df['school_name'] = survey_df['school_id_no'].apply(lambda x: f"School_{x}")
+        # Add month_num
+        def month_str_to_num(month_str):
+            try:
+                year = int(month_str[:4])
+                month = int(month_str[5:])
+                return (year - 2026) * 12 + month
+            except:
+                return 0
+        survey_df['month_num'] = survey_df['month'].apply(month_str_to_num)
+        school_info = survey_df[['school_id_no', 'school_name']].drop_duplicates().sort_values('school_id_no')
+        return survey_df, school_info, None
+    except Exception as e:
+        return None, None, f"Error processing survey: {str(e)}"
 
 def process_metadata(metadata_df):
+    """Returns (metadata_df, error_message)"""
     if metadata_df is None:
-        return None
-    if 'school_id_no' not in metadata_df.columns:
-        if 'school' in metadata_df.columns:
-            metadata_df['school_id_no'] = metadata_df['school'].astype(str).apply(lambda x: int(x.split('_')[-1]) if '_' in x else int(x))
-        else:
-            st.error("Metadata file must contain 'school_id_no' or 'school' column")
-            return None
-    if 'year_undertaken' not in metadata_df.columns:
-        metadata_df['year_undertaken'] = 2025
-    if 'utilization_date' not in metadata_df.columns:
-        metadata_df['utilization_date'] = ''
-    if 'publication_link' not in metadata_df.columns:
-        metadata_df['publication_link'] = ''
-    metadata_df['upload_date'] = pd.to_datetime(metadata_df['upload_date'])
-    return metadata_df
+        return None, "No metadata file uploaded."
+    try:
+        if 'school_id_no' not in metadata_df.columns:
+            if 'school' in metadata_df.columns:
+                metadata_df['school_id_no'] = metadata_df['school'].astype(str).apply(lambda x: int(x.split('_')[-1]) if '_' in x else int(x))
+            else:
+                return None, "Metadata file must contain 'school_id_no' or 'school' column."
+        if 'year_undertaken' not in metadata_df.columns:
+            metadata_df['year_undertaken'] = 2025
+        if 'utilization_date' not in metadata_df.columns:
+            metadata_df['utilization_date'] = ''
+        if 'publication_link' not in metadata_df.columns:
+            metadata_df['publication_link'] = ''
+        metadata_df['upload_date'] = pd.to_datetime(metadata_df['upload_date'])
+        return metadata_df, None
+    except Exception as e:
+        return None, f"Error processing metadata: {str(e)}"
 
 # ------------------------------------------------------------
-# 3. Simulation runner
-# ------------------------------------------------------------
-def run_simulation(sim, levers, survey_df, months, use_survey):
-    # Reset state (we recreate simulation with same parameters)
-    # But we need to keep the same number of schools and random events
-    # Instead of resetting, we step forward. But for Run we want clean start.
-    # We'll reinitialize the simulation and then step.
-    pass  # Actually we'll do it in the main loop
-
-# ------------------------------------------------------------
-# 4. Streamlit UI
+# Streamlit UI
 # ------------------------------------------------------------
 st.set_page_config(page_title="Research Culture Digital Twin", layout="wide")
 st.markdown("<h1 style='text-align: center; color: #1E3A8A;'>7‑Milestone Research Culture Digital Twin</h1>", unsafe_allow_html=True)
@@ -194,12 +177,12 @@ with st.sidebar:
     st.markdown("## Policy Levers & Simulation Controls")
     col1, col2 = st.columns(2)
     with col1:
-        u_train = st.slider("Training freq.", 0.0, 1.0, 0.5, 0.05, key="train")
-        u_mentor = st.slider("Mentorship ratio", 0.0, 1.0, 0.5, 0.05, key="mentor")
-        u_budget = st.slider("Support budget", 0.0, 1.0, 0.5, 0.05, key="budget")
+        u_train = st.slider("Training freq.", 0.0, 1.0, 0.5, 0.05)
+        u_mentor = st.slider("Mentorship ratio", 0.0, 1.0, 0.5, 0.05)
+        u_budget = st.slider("Support budget", 0.0, 1.0, 0.5, 0.05)
     with col2:
-        u_lead = st.slider("Leadership commit.", 0.0, 1.0, 0.5, 0.05, key="lead")
-        u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05, key="collab")
+        u_lead = st.slider("Leadership commit.", 0.0, 1.0, 0.5, 0.05)
+        u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05)
     
     levers = {
         'u_train': u_train,
@@ -231,65 +214,90 @@ with st.sidebar:
 
 # Main area
 if survey_file is not None and metadata_file is not None:
-    survey_df, metadata_df = load_data(survey_file, metadata_file)
-    survey_df, school_info, _ = process_survey(survey_df) if survey_df is not None else (None, None, None)
-    metadata_df = process_metadata(metadata_df) if metadata_df is not None else None
-    
-    if survey_df is not None and school_info is not None and metadata_df is not None:
-        st.success(f"Loaded {len(school_info)} schools.")
-        # Store state in session
-        if 'sim' not in st.session_state:
-            st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
-            st.session_state.current_month = 0
-            st.session_state.total_months = 0
-            st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]}
-                                        for sid in school_info['school_id_no'].head(num_schools).tolist()}
-            # Map agent real_id
-            for idx, agent in enumerate(st.session_state.sim.agents):
-                agent.real_id = school_info['school_id_no'].head(num_schools).tolist()[idx]
-            # Apply metadata increments
-            for agent in st.session_state.sim.agents:
-                school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
-                agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
-                agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
-                agent.C = min(1.0, agent.C + len(school_metadata[school_metadata['document_type']=='full_paper'])*0.005)
-                agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
+    try:
+        survey_df = pd.read_csv(survey_file)
+        metadata_df = pd.read_csv(metadata_file)
         
-        # Select school
-        school_ids = school_info['school_id_no'].head(num_schools).tolist()
-        school_options = [f"ID {sid}: {school_info[school_info['school_id_no']==sid]['school_name'].values[0]}" for sid in school_ids]
-        selected_school_label = st.selectbox("Select school", school_options, index=0)
-        selected_school_id = int(selected_school_label.split(":")[0].split()[1])
+        survey_df, school_info, survey_error = process_survey(survey_df)
+        metadata_df, meta_error = process_metadata(metadata_df)
         
-        # Show research outputs table
-        st.markdown("### Research Outputs")
-        df_show = metadata_df[metadata_df['school_id_no'] == selected_school_id].copy()
-        if not df_show.empty:
-            df_show_sorted = df_show.sort_values('upload_date')
-            df_show_sorted['cumulative_by_teacher'] = df_show_sorted.groupby('teacher_name').cumcount() + 1
-            st.dataframe(df_show_sorted[['teacher_name', 'year_undertaken', 'title', 'theme', 'status', 'cumulative_by_teacher']])
+        if survey_error:
+            st.error(f"Survey error: {survey_error}")
+        elif meta_error:
+            st.error(f"Metadata error: {meta_error}")
         else:
-            st.info("No research outputs for this school.")
-        
-        # Simulation logic (simplified for this demo)
-        # We'll implement step and run with state
-        if run_btn:
-            # Reset and run for duration
-            st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
-            for idx, agent in enumerate(st.session_state.sim.agents):
-                agent.real_id = school_ids[idx]
-            for agent in st.session_state.sim.agents:
-                school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
-                agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
-                agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
-                agent.C = min(1.0, agent.C + len(school_metadata[school_metadata['document_type']=='full_paper'])*0.005)
-                agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
-            st.session_state.current_month = 0
-            st.session_state.total_months = 0
-            st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]}
-                                        for sid in school_ids}
-            # Run
-            for m in range(1, duration+1):
+            st.success(f"Loaded {len(school_info)} schools.")
+            
+            # Initialize session state
+            if 'sim' not in st.session_state:
+                st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
+                st.session_state.current_month = 0
+                st.session_state.total_months = 0
+                school_ids = school_info['school_id_no'].head(num_schools).tolist()
+                st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]}
+                                            for sid in school_ids}
+                for idx, agent in enumerate(st.session_state.sim.agents):
+                    agent.real_id = school_ids[idx]
+                for agent in st.session_state.sim.agents:
+                    school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
+                    agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
+                    agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
+                    agent.C = min(1.0, agent.C + len(school_metadata[school_metadata['document_type']=='full_paper'])*0.005)
+                    agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
+            
+            # School selector
+            school_ids = school_info['school_id_no'].head(num_schools).tolist()
+            school_options = [f"ID {sid}: {school_info[school_info['school_id_no']==sid]['school_name'].values[0]}" for sid in school_ids]
+            selected_school_label = st.selectbox("Select school", school_options, index=0)
+            selected_school_id = int(selected_school_label.split(":")[0].split()[1])
+            
+            # Research outputs table
+            st.markdown("### Research Outputs")
+            df_show = metadata_df[metadata_df['school_id_no'] == selected_school_id].copy()
+            if not df_show.empty:
+                df_show_sorted = df_show.sort_values('upload_date')
+                df_show_sorted['cumulative_by_teacher'] = df_show_sorted.groupby('teacher_name').cumcount() + 1
+                st.dataframe(df_show_sorted[['teacher_name', 'year_undertaken', 'title', 'theme', 'status', 'cumulative_by_teacher']])
+            else:
+                st.info("No research outputs for this school.")
+            
+            # Simulation actions
+            if run_btn:
+                # Reset and run
+                st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
+                for idx, agent in enumerate(st.session_state.sim.agents):
+                    agent.real_id = school_ids[idx]
+                for agent in st.session_state.sim.agents:
+                    school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
+                    agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
+                    agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
+                    agent.C = min(1.0, agent.C + len(school_metadata[school_metadata['document_type']=='full_paper'])*0.005)
+                    agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
+                st.session_state.current_month = 0
+                st.session_state.total_months = 0
+                st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]}
+                                            for sid in school_ids}
+                for m in range(1, duration+1):
+                    if use_survey:
+                        for agent in st.session_state.sim.agents:
+                            row = survey_df[(survey_df['school_id_no'] == agent.real_id) & (survey_df['month_num'] == st.session_state.current_month + m)]
+                            if not row.empty:
+                                r = row.iloc[0]
+                                agent.R, agent.A, agent.C, agent.S, agent.I, agent.P, agent.M = r[['R','A','C','S','I','P','M']]
+                    st.session_state.sim.step(levers, st.session_state.current_month + m)
+                    st.session_state.current_month += 1
+                    st.session_state.total_months += 1
+                    for agent in st.session_state.sim.agents:
+                        h = st.session_state.history[agent.real_id]
+                        h['month'].append(st.session_state.total_months)
+                        for var in ['R','A','C','S','I','P','M']:
+                            h[var].append(getattr(agent, var))
+                        h['milestone'].append(agent.current_milestone)
+                        h['running_outcome'].append(agent.running_total_outcome)
+                st.rerun()
+            
+            if step_btn:
+                m = 1
                 if use_survey:
                     for agent in st.session_state.sim.agents:
                         row = survey_df[(survey_df['school_id_no'] == agent.real_id) & (survey_df['month_num'] == st.session_state.current_month + m)]
@@ -306,145 +314,119 @@ if survey_file is not None and metadata_file is not None:
                         h[var].append(getattr(agent, var))
                     h['milestone'].append(agent.current_milestone)
                     h['running_outcome'].append(agent.running_total_outcome)
-        
-        if step_btn:
-            # Step one month
-            m = 1
-            if use_survey:
+                st.rerun()
+            
+            if reset_btn:
+                # Reinitialize
+                st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
+                for idx, agent in enumerate(st.session_state.sim.agents):
+                    agent.real_id = school_ids[idx]
                 for agent in st.session_state.sim.agents:
-                    row = survey_df[(survey_df['school_id_no'] == agent.real_id) & (survey_df['month_num'] == st.session_state.current_month + m)]
-                    if not row.empty:
-                        r = row.iloc[0]
-                        agent.R, agent.A, agent.C, agent.S, agent.I, agent.P, agent.M = r[['R','A','C','S','I','P','M']]
-            st.session_state.sim.step(levers, st.session_state.current_month + m)
-            st.session_state.current_month += 1
-            st.session_state.total_months += 1
-            for agent in st.session_state.sim.agents:
-                h = st.session_state.history[agent.real_id]
-                h['month'].append(st.session_state.total_months)
-                for var in ['R','A','C','S','I','P','M']:
-                    h[var].append(getattr(agent, var))
-                h['milestone'].append(agent.current_milestone)
-                h['running_outcome'].append(agent.running_total_outcome)
-        
-        if reset_btn:
-            # Reset simulation state
-            st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
-            for idx, agent in enumerate(st.session_state.sim.agents):
-                agent.real_id = school_ids[idx]
-            for agent in st.session_state.sim.agents:
-                school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
-                agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
-                agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
-                agent.C = min(1.0, agent.C + len(school_metadata[school_metadata['document_type']=='full_paper'])*0.005)
-                agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
-            st.session_state.current_month = 0
-            st.session_state.total_months = 0
-            st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]}
-                                        for sid in school_ids}
-        
-        # Plotting
-        if st.session_state.total_months > 0:
-            hist = st.session_state.history[selected_school_id]
-            agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
-            if agent:
-                # Create Plotly subplots
-                fig = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress", "Student Learning Outcome (Running Total)", "Improvement per Completed Cycle"))
-                # Variable evolution
-                colors = ['#1E88E5', '#FFB74D', '#8E44AD', '#2ECC71', '#E67E22', '#E74C3C', '#1ABC9C']
-                vars = ['R','A','C','S','I','P','M']
-                for i, var in enumerate(vars):
-                    fig.add_trace(go.Scatter(x=hist['month'], y=hist[var], mode='lines', name=var, line=dict(color=colors[i])), row=1, col=1)
-                # Milestone
-                fig.add_trace(go.Scatter(x=hist['month'], y=hist['milestone'], mode='lines', name='Milestone', line=dict(color='#D32F2F')), row=1, col=2)
-                # Running outcome
-                fig.add_trace(go.Scatter(x=hist['month'], y=hist['running_outcome'], mode='lines', name='Outcome', line=dict(color='#2E7D32')), row=2, col=1)
-                # Per-cycle improvement
-                if agent.cycle_improvements:
-                    cycles = [c.cycle_number for c in agent.cycle_improvements]
-                    improvements = [c.total_improvement for c in agent.cycle_improvements]
-                    fig.add_trace(go.Bar(x=cycles, y=improvements, name='Improvement', marker_color='#F39C12'), row=2, col=2)
-                else:
-                    fig.add_annotation(text="No cycles completed yet", xref="x2 domain", yref="y2 domain", x=0.5, y=0.5, showarrow=False, row=2, col=2)
-                fig.update_layout(height=800, showlegend=True)
-                fig.update_xaxes(title_text="Month", row=1, col=1)
-                fig.update_yaxes(title_text="Value (0-1)", row=1, col=1)
-                fig.update_xaxes(title_text="Month", row=1, col=2)
-                fig.update_yaxes(title_text="Milestone", row=1, col=2)
-                fig.update_xaxes(title_text="Month", row=2, col=1)
-                fig.update_yaxes(title_text="Cumulative Improvement", row=2, col=1)
-                fig.update_xaxes(title_text="Cycle Number", row=2, col=2)
-                fig.update_yaxes(title_text="Improvement", row=2, col=2)
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Synopses
-                outcome_val = agent.running_total_outcome
-                # define interpretation levels
-                intervals = [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]
-                level = "Exceptional"
-                for low,high,lev in intervals:
-                    if low <= outcome_val < high:
-                        level = lev
-                        break
-                st.markdown(f"""
-                <div style="background-color: #E3F2FD; border-left: 5px solid #1E88E5; padding: 10px; border-radius: 5px;">
-                <b>📌 School {selected_school_id} Synopsis:</b><br>
-                After {st.session_state.total_months} months: Milestone = {agent.current_milestone} | Completed cycles = {agent.cycle_count}<br>
-                Cumulative student outcome improvement = <b>{outcome_val:.3f}</b> → <b>{level}</b> level.
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Division synopsis
-                total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
-                avg_outcome = total_outcome / len(st.session_state.sim.agents)
-                level_avg = "Exceptional"
-                for low,high,lev in intervals:
-                    if low <= avg_outcome < high:
-                        level_avg = lev
-                        break
-                total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
-                avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
-                st.markdown(f"""
-                <div style="background-color: #E8F5E9; border-left: 5px solid #2E7D32; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                <b>🏢 Division-Level Synopsis:</b><br>
-                Average milestone = {avg_milestone:.1f} | Total completed cycles = {total_cycles}<br>
-                Average cumulative outcome = {avg_outcome:.3f} → <b>{level_avg}</b> level.
-                </div>
-                """, unsafe_allow_html=True)
-                
-                # Interpretation expander
-                with st.expander("📊 Graph Interpretations"):
-                    st.markdown("""
-                    - **Variable Evolution:** Shows how R, A, C, S, I, P, M change over time. Higher values (closer to 1) mean stronger readiness, awareness, capacity, etc.
-                    - **Milestone Progress:** The school moves through milestones 0–6. Reaching milestone 6 and cycling back indicates a full sustainable cycle.
-                    - **Student Learning Outcome (Running Total):** Cumulative improvement in learner outcomes.
-                    - **Improvement per Completed Cycle:** Each bar shows the improvement contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
-                    """)
-        
-        if export_btn:
-            # Prepare dataframes
-            all_data = []
-            for agent in st.session_state.sim.agents:
-                h = st.session_state.history[agent.real_id]
-                for t in range(len(h['month'])):
-                    row = {'school_id': agent.real_id, 'month': h['month'][t], 'milestone': h['milestone'][t],
-                           'running_outcome': h['running_outcome'][t]}
-                    for var in ['R','A','C','S','I','P','M']:
-                        row[var] = h[var][t]
-                    all_data.append(row)
-            df_hist = pd.DataFrame(all_data)
-            cycle_records = []
-            for agent in st.session_state.sim.agents:
-                for rec in agent.cycle_improvements:
-                    cycle_records.append({'school_id': agent.real_id, 'cycle_number': rec.cycle_number,
-                                          'total_improvement': rec.total_improvement, 'completion_month': rec.completion_month})
-            df_cycles = pd.DataFrame(cycle_records)
-            # Convert to CSV and download
-            csv1 = df_hist.to_csv(index=False).encode('utf-8')
-            csv2 = df_cycles.to_csv(index=False).encode('utf-8')
-            st.download_button("Download simulation history", csv1, "simulation_history.csv", "text/csv")
-            st.download_button("Download cycle improvements", csv2, "cycle_improvements.csv", "text/csv")
-    else:
-        st.warning("Please upload both CSV files with the required columns.")
+                    school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
+                    agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
+                    agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
+                    agent.C = min(1.0, agent.C + len(school_metadata[school_metadata['document_type']=='full_paper'])*0.005)
+                    agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
+                st.session_state.current_month = 0
+                st.session_state.total_months = 0
+                st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]}
+                                            for sid in school_ids}
+                st.rerun()
+            
+            # Display plots if history exists
+            if st.session_state.total_months > 0:
+                hist = st.session_state.history.get(selected_school_id, None)
+                agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
+                if hist and agent:
+                    # Create Plotly subplots
+                    fig = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress", "Student Learning Outcome (Running Total)", "Improvement per Completed Cycle"))
+                    colors = ['#1E88E5', '#FFB74D', '#8E44AD', '#2ECC71', '#E67E22', '#E74C3C', '#1ABC9C']
+                    vars_ = ['R','A','C','S','I','P','M']
+                    for i, var in enumerate(vars_):
+                        fig.add_trace(go.Scatter(x=hist['month'], y=hist[var], mode='lines', name=var, line=dict(color=colors[i])), row=1, col=1)
+                    fig.add_trace(go.Scatter(x=hist['month'], y=hist['milestone'], mode='lines', name='Milestone', line=dict(color='#D32F2F')), row=1, col=2)
+                    fig.add_trace(go.Scatter(x=hist['month'], y=hist['running_outcome'], mode='lines', name='Outcome', line=dict(color='#2E7D32')), row=2, col=1)
+                    if agent.cycle_improvements:
+                        cycles = [c.cycle_number for c in agent.cycle_improvements]
+                        improvements = [c.total_improvement for c in agent.cycle_improvements]
+                        fig.add_trace(go.Bar(x=cycles, y=improvements, name='Improvement', marker_color='#F39C12'), row=2, col=2)
+                    else:
+                        fig.add_annotation(text="No cycles completed yet", xref="x2 domain", yref="y2 domain", x=0.5, y=0.5, showarrow=False, row=2, col=2)
+                    fig.update_layout(height=800, showlegend=True)
+                    fig.update_xaxes(title_text="Month", row=1, col=1)
+                    fig.update_yaxes(title_text="Value (0-1)", row=1, col=1)
+                    fig.update_xaxes(title_text="Month", row=1, col=2)
+                    fig.update_yaxes(title_text="Milestone", row=1, col=2)
+                    fig.update_xaxes(title_text="Month", row=2, col=1)
+                    fig.update_yaxes(title_text="Cumulative Improvement", row=2, col=1)
+                    fig.update_xaxes(title_text="Cycle Number", row=2, col=2)
+                    fig.update_yaxes(title_text="Improvement", row=2, col=2)
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Synopses
+                    outcome_val = agent.running_total_outcome
+                    intervals = [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]
+                    level = "Exceptional"
+                    for low,high,lev in intervals:
+                        if low <= outcome_val < high:
+                            level = lev
+                            break
+                    st.markdown(f"""
+                    <div style="background-color: #E3F2FD; border-left: 5px solid #1E88E5; padding: 10px; border-radius: 5px;">
+                    <b>📌 School {selected_school_id} Synopsis:</b><br>
+                    After {st.session_state.total_months} months: Milestone = {agent.current_milestone} | Completed cycles = {agent.cycle_count}<br>
+                    Cumulative student outcome improvement = <b>{outcome_val:.3f}</b> → <b>{level}</b> level.
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
+                    avg_outcome = total_outcome / len(st.session_state.sim.agents)
+                    level_avg = "Exceptional"
+                    for low,high,lev in intervals:
+                        if low <= avg_outcome < high:
+                            level_avg = lev
+                            break
+                    total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
+                    avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
+                    st.markdown(f"""
+                    <div style="background-color: #E8F5E9; border-left: 5px solid #2E7D32; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                    <b>🏢 Division-Level Synopsis:</b><br>
+                    Average milestone = {avg_milestone:.1f} | Total completed cycles = {total_cycles}<br>
+                    Average cumulative outcome = {avg_outcome:.3f} → <b>{level_avg}</b> level.
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    with st.expander("📊 Graph Interpretations"):
+                        st.markdown("""
+                        - **Variable Evolution:** Shows how R, A, C, S, I, P, M change over time. Higher values (closer to 1) mean stronger readiness, awareness, capacity, etc.
+                        - **Milestone Progress:** The school moves through milestones 0–6. Reaching milestone 6 and cycling back indicates a full sustainable cycle.
+                        - **Student Learning Outcome (Running Total):** Cumulative improvement in learner outcomes.
+                        - **Improvement per Completed Cycle:** Each bar shows the improvement contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
+                        """)
+            
+            if export_btn:
+                # Prepare dataframes
+                all_data = []
+                for agent in st.session_state.sim.agents:
+                    h = st.session_state.history[agent.real_id]
+                    for t in range(len(h['month'])):
+                        row = {'school_id': agent.real_id, 'month': h['month'][t], 'milestone': h['milestone'][t],
+                               'running_outcome': h['running_outcome'][t]}
+                        for var in ['R','A','C','S','I','P','M']:
+                            row[var] = h[var][t]
+                        all_data.append(row)
+                df_hist = pd.DataFrame(all_data)
+                cycle_records = []
+                for agent in st.session_state.sim.agents:
+                    for rec in agent.cycle_improvements:
+                        cycle_records.append({'school_id': agent.real_id, 'cycle_number': rec.cycle_number,
+                                              'total_improvement': rec.total_improvement, 'completion_month': rec.completion_month})
+                df_cycles = pd.DataFrame(cycle_records)
+                csv1 = df_hist.to_csv(index=False).encode('utf-8')
+                csv2 = df_cycles.to_csv(index=False).encode('utf-8')
+                st.download_button("Download simulation history", csv1, "simulation_history.csv", "text/csv")
+                st.download_button("Download cycle improvements", csv2, "cycle_improvements.csv", "text/csv")
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
 else:
     st.info("Please upload quarterly survey and research metadata CSV files to begin.")
