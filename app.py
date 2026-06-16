@@ -294,25 +294,23 @@ def cycle_research_correlation(agent, metadata_df, school_id):
         st.caption("📝 First cycle completed. Continued research output will be needed to build sustainability.")
 
 # ------------------------------------------------------------
-# Helper for average milestone interpretation (ranges)
+# Helper to interpret average milestone with requested ranges
 # ------------------------------------------------------------
 def interpret_avg_milestone(avg_milestone):
     if avg_milestone < 0.5:
-        return f"{avg_milestone:.1f} → at or near Milestone 0 (Readiness and Relevance), just starting the journey."
+        return f"{avg_milestone:.1f} → between M0 and M1, approaching M1"
     elif avg_milestone < 1.5:
-        return f"{avg_milestone:.1f} → between M0 and M1, approaching M1 (Awareness to Action)"
+        return f"{avg_milestone:.1f} → between M1 and M2"
     elif avg_milestone < 2.5:
-        return f"{avg_milestone:.1f} → between M1 and M2 (Capacity Spark)"
+        return f"{avg_milestone:.1f} → between M2 and M3"
     elif avg_milestone < 3.5:
-        return f"{avg_milestone:.1f} → between M2 and M3 (Structured Support)"
+        return f"{avg_milestone:.1f} → between M3 and M4"
     elif avg_milestone < 4.5:
-        return f"{avg_milestone:.1f} → between M3 and M4 (Institutional Anchoring)"
+        return f"{avg_milestone:.1f} → between M4 and M5"
     elif avg_milestone < 5.5:
-        return f"{avg_milestone:.1f} → between M4 and M5 (Community of Practice)"
-    elif avg_milestone < 6.5:
-        return f"{avg_milestone:.1f} → between M5 and M6 (Impact Realization)"
+        return f"{avg_milestone:.1f} → between M5 and M6"
     else:
-        return f"{avg_milestone:.1f} → at or beyond Milestone 6 (Impact Realization), indicating a mature, self‑sustaining research culture."
+        return f"{avg_milestone:.1f} → at or beyond M6 (Impact Realization)"
 
 # ------------------------------------------------------------
 # Streamlit UI
@@ -499,11 +497,11 @@ if survey_file is not None and metadata_file is not None:
                     outcome_table_html = f"""
                     <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; border: 1px solid {USTP_DARK_BLUE};">
                     <tr style="background-color: {USTP_DARK_BLUE}; color: white;"><th>RCSI Range</th><th>Level</th><th>Description</th></tr>
-                    <tr><td>0.0 – 0.2</td><td>Very Low</td><td>Little to no accumulated research culture strength.</td></tr>
-                    <tr><td>0.2 – 0.4</td><td>Low</td><td>Minimal ecosystem vitality; research culture still weak.</td></tr>
-                    <tr><td>0.4 – 0.6</td><td>Moderate</td><td>Noticeable strength; research culture developing.</td></tr>
-                    <tr><td>0.6 – 0.8</td><td>High</td><td>Strong ecosystem; research culture becoming sustainable.</td></tr>
-                    <tr><td>0.8 – 1.0</td><td>Very High</td><td>Excellent vitality; research culture fully embedded.</td></tr>
+                    <tr><td>0.0 – 0.2</td><td>Very Low</td><td>Little to no accumulated research culture strength.固
+                    <tr><td>0.2 – 0.4</td><td>Low</td><td>Minimal ecosystem vitality; research culture still weak.固
+                    <tr><td>0.4 – 0.6</td><td>Moderate</td><td>Noticeable strength; research culture developing.固
+                    <tr><td>0.6 – 0.8</td><td>High固<td>Strong ecosystem; research culture becoming sustainable.固
+                    <tr><td>0.8 – 1.0</td><td>Very High固<td>Excellent vitality; research culture fully embedded.固
                     </table>
                     """
                     st.markdown(outcome_table_html, unsafe_allow_html=True)
@@ -551,7 +549,7 @@ if survey_file is not None and metadata_file is not None:
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # ---- Division synopsis (corrected with average milestone interpretation) ----
+                    # ---- Division synopsis (with average milestone interpretation) ----
                     total_schools = len(st.session_state.sim.agents)
                     early_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
                     advanced_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
@@ -560,7 +558,6 @@ if survey_file is not None and metadata_file is not None:
                     advanced_percent = (advanced_stage_count / total_schools) * 100 if total_schools > 0 else 0
                     transitional_percent = (transitional_count / total_schools) * 100 if total_schools > 0 else 0
 
-                    # Early stages text
                     if early_percent == 100:
                         early_text = "All schools"
                     elif early_percent >= 75:
@@ -572,7 +569,6 @@ if survey_file is not None and metadata_file is not None:
                     else:
                         early_text = "No schools"
 
-                    # Advanced stages text
                     if advanced_percent == 100:
                         advanced_text = "All schools"
                     elif advanced_percent >= 75:
@@ -584,7 +580,6 @@ if survey_file is not None and metadata_file is not None:
                     else:
                         advanced_text = "No schools"
 
-                    # Sustainability assessment based on early_percent (milestone ≤2)
                     if early_percent == 100:
                         sustainability_text = "All schools are still in early milestones (M0–M2); foundational capacity‑building is the priority to advance the division’s research culture."
                     elif early_percent >= 75:
