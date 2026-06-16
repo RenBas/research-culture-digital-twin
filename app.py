@@ -16,7 +16,7 @@ USTP_GOLD = "#F5A623"
 DEPED_RED = "#D32F2F"
 DEPED_MAROON = "#8B0000"
 LIGHT_BG = "#F8F9FA"
-DIVISION_GREEN = "#2E7D32"   # for division synopsis (kept from earlier)
+DIVISION_GREEN = "#2E7D32"
 
 # Custom CSS for Streamlit
 st.markdown(f"""
@@ -45,7 +45,6 @@ st.markdown(f"""
     .stButton > button:focus {{
         box-shadow: none;
     }}
-    /* Secondary buttons (Step, Reset) */
     div[data-testid="column"]:nth-of-type(2) .stButton > button,
     div[data-testid="column"]:nth-of-type(3) .stButton > button {{
         background-color: #6C757D;
@@ -305,10 +304,10 @@ def cycle_research_correlation(agent, metadata_df, school_id):
     st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------
-# Streamlit UI (colored)
+# Streamlit UI (coloured with new title)
 # ------------------------------------------------------------
-st.set_page_config(page_title="Research Culture Digital Twin", layout="wide")
-st.markdown(f"<h1 style='text-align: center; color: {USTP_DARK_BLUE};'>7‑Milestone Research Culture Digital Twin</h1>", unsafe_allow_html=True)
+st.set_page_config(page_title="7-Milestone Research Culture Sustainability Framework", layout="wide")
+st.markdown(f"<h1 style='text-align: center; color: {USTP_DARK_BLUE};'>7‑Milestone Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
 
 # Sidebar
 with st.sidebar:
@@ -471,7 +470,7 @@ if survey_file is not None and metadata_file is not None:
                 hist = st.session_state.history.get(selected_school_id, None)
                 agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
                 if hist and agent:
-                    # Main plots with colors
+                    # Main plots with colours
                     fig1 = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress", "Research Culture Sustainability Index (RCSI)", "Improvement per Completed Cycle"))
                     colors = ['#1E88E5', USTP_GOLD, '#8E44AD', '#2ECC71', '#E67E22', DEPED_RED, '#1ABC9C']
                     vars_ = ['R','A','C','S','I','P','M']
@@ -555,6 +554,40 @@ if survey_file is not None and metadata_file is not None:
                     advanced_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4 or a.cycle_count >= 1)
                     early_percent = (early_count / total_schools) * 100
                     advanced_percent = (advanced_count / total_schools) * 100
+                    
+                    # Precise language for early stages
+                    if early_percent == 100.0:
+                        early_text = "All schools"
+                    elif early_percent >= 75:
+                        early_text = "The vast majority of schools"
+                    elif early_percent >= 50:
+                        early_text = "More than half of schools"
+                    elif early_percent > 0:
+                        early_text = f"{early_percent:.1f}% of schools"
+                    else:
+                        early_text = "No schools"
+                    
+                    if advanced_percent == 100.0:
+                        advanced_text = "All schools"
+                    elif advanced_percent >= 75:
+                        advanced_text = "The vast majority of schools"
+                    elif advanced_percent >= 50:
+                        advanced_text = "More than half of schools"
+                    elif advanced_percent > 0:
+                        advanced_text = f"{advanced_percent:.1f}% of schools"
+                    else:
+                        advanced_text = "No schools"
+                    
+                    # Division sustainability interpretation based on early_percent
+                    if early_percent == 0:
+                        sustainability_text = "All schools have moved beyond early stages; the division is showing strong research culture."
+                    elif early_percent <= 30:
+                        sustainability_text = "Only a few schools remain in early stages; the division is making good progress toward sustainability."
+                    elif early_percent <= 60:
+                        sustainability_text = "A moderate number of schools are still in early stages; targeted policy interventions may help."
+                    else:
+                        sustainability_text = "The majority of schools are still in early stages of research culture development."
+                    
                     total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
                     avg_rcsi = total_outcome / total_schools
                     level_avg = "Exceptional"
@@ -570,13 +603,9 @@ if survey_file is not None and metadata_file is not None:
                     <b>🏢 Division‑Level Synopsis (all {total_schools} schools):</b><br>
                     Average milestone = {avg_milestone:.1f} | Total completed cycles across all schools = {total_cycles}<br>
                     Average RCSI = {avg_rcsi:.3f} → <b>{level_avg}</b> level.<br>
-                    <i>Stage distribution:</i> {early_percent:.1f}% of schools are in early stages (milestone ≤2 or no cycle).<br>
-                    {advanced_percent:.1f}% have reached advanced stages (milestone ≥4 or at least one cycle).<br>
-                    <i>Division‑wide sustainability:</i> {
-                        "The division is showing strong research culture with multiple cycles and high impact." if total_cycles > total_schools else
-                        "The division has a moderate research culture; policy adjustments may accelerate progress." if avg_milestone >= 4 else
-                        "Most schools are still in early stages of research culture development."
-                    }
+                    <i>Stage distribution:</i> {early_text} are in early stages (milestone ≤2 or no cycle).<br>
+                    {advanced_text} have reached advanced stages (milestone ≥4 or at least one cycle).<br>
+                    <i>Division‑wide sustainability:</i> {sustainability_text}
                     </div>
                     """
                     st.markdown(division_html, unsafe_allow_html=True)
