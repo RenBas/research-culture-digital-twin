@@ -492,19 +492,17 @@ if survey_file is not None and metadata_file is not None:
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id)
 
-                    # RCSI interpretation table
-                    st.markdown(f"### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
-                    outcome_table_html = f"""
-                    <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; border: 1px solid {USTP_DARK_BLUE};">
-                    <tr style="background-color: {USTP_DARK_BLUE}; color: white;"><th>RCSI Range</th><th>Level</th><th>Description</th></tr>
-                    <tr><td>0.0 – 0.2</td><td>Very Low</td><td>Little to no accumulated research culture strength.固
-                    <tr><td>0.2 – 0.4</td><td>Low</td><td>Minimal ecosystem vitality; research culture still weak.固
-                    <tr><td>0.4 – 0.6</td><td>Moderate</td><td>Noticeable strength; research culture developing.固
-                    <tr><td>0.6 – 0.8</td><td>High固<td>Strong ecosystem; research culture becoming sustainable.固
-                    <tr><td>0.8 – 1.0</td><td>Very High固<td>Excellent vitality; research culture fully embedded.固
-                    </table>
-                    """
-                    st.markdown(outcome_table_html, unsafe_allow_html=True)
+                    # RCSI interpretation table (plain Markdown, no HTML)
+                    st.markdown("### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
+                    st.markdown("""
+                    | RCSI Range | Level | Description |
+                    |------------|-------|-------------|
+                    | 0.0 – 0.2 | Very Low | Little to no accumulated research culture strength. |
+                    | 0.2 – 0.4 | Low | Minimal ecosystem vitality; research culture still weak. |
+                    | 0.4 – 0.6 | Moderate | Noticeable strength; research culture developing. |
+                    | 0.6 – 0.8 | High | Strong ecosystem; research culture becoming sustainable. |
+                    | 0.8 – 1.0 | Very High | Excellent vitality; research culture fully embedded. |
+                    """)
 
                     # Per‑school synopsis (coherent)
                     rcsi_val = agent.running_total_outcome
