@@ -116,7 +116,7 @@ class Simulation:
         return self.agents[idx]
 
 # ------------------------------------------------------------
-# Data processing functions (corrected)
+# Data processing functions
 # ------------------------------------------------------------
 def process_survey(survey_df):
     """Returns (survey_df, school_info, error_message)"""
@@ -190,7 +190,7 @@ with st.sidebar:
         'u_collab': u_collab
     }
     
-    # Maximum schools set to 200
+    # Maximum schools = 200
     max_schools_allowed = 200
     num_schools = st.number_input("Number of schools", min_value=1, max_value=max_schools_allowed, value=20, step=1)
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
@@ -363,9 +363,7 @@ if survey_file is not None and metadata_file is not None:
                     fig.update_yaxes(title_text="Improvement", row=2, col=2)
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # ---------------------------
-                    # Interpretation Table for Cumulative Student Outcome
-                    # ---------------------------
+                    # --- Interpretation Table for Cumulative Student Outcome ---
                     st.markdown("### 📈 Cumulative Student Outcome Interpretation Table")
                     outcome_table_html = """
                     <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
@@ -381,22 +379,38 @@ if survey_file is not None and metadata_file is not None:
                     """
                     st.markdown(outcome_table_html, unsafe_allow_html=True)
                     
-                    # Synopses using the same intervals
-                    outcome_val = agent.running_total_outcome
+                    # --- School and Division Synopses with Sustainability Culture ---
+                    # Prepare the same intervals for numeric outcome levels
                     intervals = [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]
+                    
+                    # School synopsis
+                    outcome_val = agent.running_total_outcome
                     level = "Exceptional"
                     for low,high,lev in intervals:
                         if low <= outcome_val < high:
                             level = lev
                             break
-                    st.markdown(f"""
-                    <div style="background-color: #E3F2FD; border-left: 5px solid #1E88E5; padding: 10px; border-radius: 5px;">
+                    # Determine sustainability culture based on cycles and milestone
+                    if agent.cycle_count >= 2:
+                        sustainability_text = "The school has reached a self‑sustaining research culture (multiple cycles)."
+                    elif agent.cycle_count == 1:
+                        sustainability_text = "The school has completed one full cycle, showing initial sustainability."
+                    elif agent.current_milestone >= 4:
+                        sustainability_text = "The school is approaching sustainability but has not yet completed a full cycle."
+                    else:
+                        sustainability_text = "The school is still in early stages of research culture development."
+                    
+                    per_school_html = f"""
+                    <div style="background-color: #E3F2FD; border-left: 5px solid #1E88E5; padding: 10px; border-radius: 5px; margin-top: 10px;">
                     <b>📌 School {selected_school_id} Synopsis:</b><br>
                     After {st.session_state.total_months} months: Milestone = {agent.current_milestone} | Completed cycles = {agent.cycle_count}<br>
-                    Cumulative student outcome improvement = <b>{outcome_val:.3f}</b> → <b>{level}</b> level.
+                    Cumulative student outcome improvement = <b>{outcome_val:.3f}</b> → <b>{level}</b> level.<br>
+                    <i>Research Sustainability Culture:</i> {sustainability_text}
                     </div>
-                    """, unsafe_allow_html=True)
+                    """
+                    st.markdown(per_school_html, unsafe_allow_html=True)
                     
+                    # Division synopsis
                     total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
                     avg_outcome = total_outcome / len(st.session_state.sim.agents)
                     level_avg = "Exceptional"
@@ -406,14 +420,25 @@ if survey_file is not None and metadata_file is not None:
                             break
                     total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
                     avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
-                    st.markdown(f"""
-                    <div style="background-color: #E8F5E9; border-left: 5px solid #2E7D32; padding: 10px; border-radius: 5px; margin-top: 10px;">
-                    <b>🏢 Division-Level Synopsis:</b><br>
-                    Average milestone = {avg_milestone:.1f} | Total completed cycles = {total_cycles}<br>
-                    Average cumulative outcome = {avg_outcome:.3f} → <b>{level_avg}</b> level.
-                    </div>
-                    """, unsafe_allow_html=True)
+                    # Division sustainability interpretation
+                    if total_cycles > len(st.session_state.sim.agents):
+                        div_sustainability = "The division is showing strong research culture with multiple cycles and high impact."
+                    elif avg_milestone >= 4:
+                        div_sustainability = "The division has a moderate research culture; policy adjustments may accelerate progress."
+                    else:
+                        div_sustainability = "Most schools are still in early stages of research culture development."
                     
+                    division_html = f"""
+                    <div style="background-color: #E8F5E9; border-left: 5px solid #2E7D32; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                    <b>🏢 Division‑Level Synopsis (all {len(st.session_state.sim.agents)} schools):</b><br>
+                    Average milestone = {avg_milestone:.1f} | Total completed cycles across all schools = {total_cycles}<br>
+                    Cumulative student outcome improvement (sum) = {total_outcome:.3f}, average per school = {avg_outcome:.3f} → <b>{level_avg}</b> level.<br>
+                    <i>Division‑wide sustainability:</i> {div_sustainability}
+                    </div>
+                    """
+                    st.markdown(division_html, unsafe_allow_html=True)
+                    
+                    # Graph interpretations expander
                     with st.expander("📊 Graph Interpretations"):
                         st.markdown("""
                         - **Variable Evolution:** Shows how R, A, C, S, I, P, M change over time. Higher values (closer to 1) mean stronger readiness, awareness, capacity, etc.
@@ -423,7 +448,6 @@ if survey_file is not None and metadata_file is not None:
                         """)
             
             if export_btn:
-                # Prepare dataframes
                 all_data = []
                 for agent in st.session_state.sim.agents:
                     h = st.session_state.history[agent.real_id]
@@ -444,6 +468,7 @@ if survey_file is not None and metadata_file is not None:
                 csv2 = df_cycles.to_csv(index=False).encode('utf-8')
                 st.download_button("Download simulation history", csv1, "simulation_history.csv", "text/csv")
                 st.download_button("Download cycle improvements", csv2, "cycle_improvements.csv", "text/csv")
+                
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 else:
