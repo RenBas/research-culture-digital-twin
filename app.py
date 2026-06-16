@@ -18,7 +18,7 @@ DEPED_MAROON = "#8B0000"
 LIGHT_BG = "#F8F9FA"
 DIVISION_GREEN = "#2E7D32"
 
-# Custom CSS for Streamlit
+# Custom CSS for Streamlit (unchanged)
 st.markdown(f"""
 <style>
     .reportview-container .main .block-container {{
@@ -177,7 +177,7 @@ class Simulation:
         return self.agents[idx]
 
 # ------------------------------------------------------------
-# Data processing functions
+# Data processing functions (unchanged)
 # ------------------------------------------------------------
 def process_survey(survey_df):
     if survey_df is None:
@@ -230,8 +230,17 @@ def get_latest_survey(survey_df, school_id):
     return school_data.sort_values('month_num').iloc[-1]
 
 def radar_chart(survey_row, school_name):
-    variables = ['R', 'A', 'C', 'S', 'I', 'P', 'M']
-    values = [survey_row[v] for v in variables]
+    # Variables with milestone numbers
+    variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
+    # Map original variable names to values
+    value_map = {'R (M0)': survey_row['R'],
+                 'A (M1)': survey_row['A'],
+                 'C (M2)': survey_row['C'],
+                 'S (M3)': survey_row['S'],
+                 'I (M4)': survey_row['I'],
+                 'P (M5)': survey_row['P'],
+                 'M (M6)': survey_row['M']}
+    values = [value_map[v] for v in variables]
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(
         r=values,
@@ -247,7 +256,15 @@ def radar_chart(survey_row, school_name):
         ),
         title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
         showlegend=False,
-        font=dict(color=USTP_DARK_BLUE)
+        font=dict(color=USTP_DARK_BLUE),
+        annotations=[
+            dict(
+                text="Milestone cycle direction: 0 → 1 → 2 → 3 → 4 → 5 → 6 → 0 (clockwise)",
+                xref="paper", yref="paper",
+                x=0.5, y=-0.1, showarrow=False,
+                font=dict(size=10, color=USTP_DARK_BLUE)
+            )
+        ]
     )
     return fig
 
@@ -259,11 +276,25 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
     theme_counts = school_meta['theme'].value_counts().reset_index()
     theme_counts.columns = ['Theme', 'Count']
     fig_theme = px.bar(theme_counts, x='Theme', y='Count', title=f"Theme Distribution – {school_name}", color='Theme', color_discrete_sequence=[USTP_GOLD, DEPED_RED, USTP_DARK_BLUE])
+    fig_theme.update_layout(title="Theme Distribution")
+    st.plotly_chart(fig_theme, use_container_width=True)
+    # Interpretation for theme distribution
+    if len(theme_counts) > 0:
+        top_theme = theme_counts.iloc[0]['Theme']
+        st.caption(f"📝 Research outputs are most concentrated in '{top_theme}'. This suggests the school’s research focus area.")
+    
     status_counts = school_meta['status'].value_counts().reset_index()
     status_counts.columns = ['Status', 'Count']
     fig_status = px.bar(status_counts, x='Status', y='Count', title=f"Publication Status – {school_name}", color='Status', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_MAROON])
+    fig_status.update_layout(title="Publication Status")
+    st.plotly_chart(fig_status, use_container_width=True)
+    # Interpretation for publication status
+    if not status_counts.empty:
+        published = status_counts[status_counts['Status']=='published']['Count'].sum()
+        total = status_counts['Count'].sum()
+        pub_rate = (published/total*100) if total>0 else 0
+        st.caption(f"📝 {pub_rate:.1f}% of research outputs are published. A higher publication rate often correlates with greater institutional recognition.")
     
-    # School-level utilisation rate with tooltip
     utilised = school_meta['utilized_by_school'].sum() if 'utilized_by_school' in school_meta.columns else 0
     total = len(school_meta)
     util_rate = (utilised / total * 100) if total > 0 else 0
@@ -272,18 +303,20 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
         value=f"{util_rate:.1f}%",
         help="Percentage of research outputs from this school that have been adopted into practice (e.g., new teaching strategies, policy changes)."
     )
+    st.caption(f"📝 {'High utilisation indicates strong translation of research into practice.' if util_rate > 70 else 'Moderate or low utilisation suggests a gap between research production and practical adoption.'}")
     
     teacher_counts = school_meta['teacher_name'].value_counts().reset_index().head(10)
     teacher_counts.columns = ['Teacher', 'Number of Outputs']
     fig_teacher = px.bar(teacher_counts, x='Number of Outputs', y='Teacher', orientation='h', title=f"Teacher Productivity (Top 10) – {school_name}", color='Number of Outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
-    st.plotly_chart(fig_theme, use_container_width=True)
-    st.plotly_chart(fig_status, use_container_width=True)
+    fig_teacher.update_layout(title="Teacher Productivity")
     st.plotly_chart(fig_teacher, use_container_width=True)
+    if not teacher_counts.empty:
+        st.caption(f"📝 The most productive teacher has {teacher_counts.iloc[0]['Number of Outputs']} research outputs. Encouraging collaborative research could further strengthen culture.")
 
 def cycle_research_correlation(agent, metadata_df, school_id):
     if not agent.cycle_improvements:
         st.info("No cycles completed yet for this school.")
-        return
+        return None
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     def date_to_month_num(d):
         return (d.year - 2026) * 12 + d.month
@@ -309,14 +342,47 @@ def cycle_research_correlation(agent, metadata_df, school_id):
         font=dict(color=USTP_DARK_BLUE)
     )
     st.plotly_chart(fig, use_container_width=True)
+    # Interpretation
+    if len(cumulative_outputs) >= 2:
+        increase = cumulative_outputs[-1] - cumulative_outputs[-2]
+        if increase > 0:
+            st.caption(f"📝 Research output accumulation increases with each cycle (+{increase} outputs from previous cycle). This suggests a growing research culture.")
+        else:
+            st.caption("📝 Research output growth has plateaued across cycles. Consider policies to revitalise research engagement.")
+    elif len(cumulative_outputs) == 1:
+        st.caption("📝 First cycle completed. Continued research output will be needed to build sustainability.")
+    return cumulative_outputs
 
 # ------------------------------------------------------------
-# Streamlit UI (coloured, final)
+# Helper to generate interpretations for main plots
+# ------------------------------------------------------------
+def plot_interpretations(agent, hist, selected_school_name, selected_school_id):
+    interpretations = []
+    # Variable Evolution
+    latest_R = hist['R'][-1] if hist['R'] else 0
+    latest_M = hist['M'][-1] if hist['M'] else 0
+    interpretations.append(f"Variable Evolution: The school's readiness (R) ends at {latest_R:.2f} and impact (M) at {latest_M:.2f}. A rising M indicates growing research influence.")
+    # Milestone Progress
+    final_milestone = agent.current_milestone
+    interpretations.append(f"Milestone Progress: The school reached milestone {final_milestone} out of 6. Higher milestones mean more embedded research culture.")
+    # RCSI
+    rcsi = agent.running_total_outcome
+    interpretations.append(f"Research Culture Sustainability Index (RCSI): Currently {rcsi:.3f} – this cumulative index reflects the long‑term vitality of the research ecosystem.")
+    # Improvement per Cycle
+    if agent.cycle_improvements:
+        last_cycle_improvement = agent.cycle_improvements[-1].total_improvement
+        interpretations.append(f"Improvement per Cycle: The most recent cycle contributed {last_cycle_improvement:.3f} to the RCSI. Increasing values across cycles signal strengthening sustainability.")
+    else:
+        interpretations.append("Improvement per Cycle: No cycles completed yet. Policy adjustments may accelerate the first cycle.")
+    return interpretations
+
+# ------------------------------------------------------------
+# Streamlit UI (final enhanced)
 # ------------------------------------------------------------
 st.set_page_config(page_title="7-Milestone Research Culture Sustainability Framework", layout="wide")
 st.markdown(f"<h1 style='text-align: center; color: {USTP_DARK_BLUE};'>7‑Milestone Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
 
-# Sidebar
+# Sidebar (unchanged)
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Policy Levers & Simulation Controls</h2>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
@@ -403,7 +469,7 @@ if survey_file is not None and metadata_file is not None:
             else:
                 st.info("No research outputs for this school.")
             
-            # Simulation actions
+            # Simulation actions (run, step, reset) - same as before
             if run_btn:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
@@ -477,7 +543,7 @@ if survey_file is not None and metadata_file is not None:
                 hist = st.session_state.history.get(selected_school_id, None)
                 agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
                 if hist and agent:
-                    # Main plots
+                    # Main plots (same as before)
                     fig1 = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress", "Research Culture Sustainability Index (RCSI)", "Improvement per Completed Cycle"))
                     colors = ['#1E88E5', USTP_GOLD, '#8E44AD', '#2ECC71', '#E67E22', DEPED_RED, '#1ABC9C']
                     vars_ = ['R','A','C','S','I','P','M']
@@ -502,19 +568,29 @@ if survey_file is not None and metadata_file is not None:
                     fig1.update_yaxes(title_text="RCSI", row=2, col=2)
                     st.plotly_chart(fig1, use_container_width=True)
                     
+                    # Interpretations for main plots
+                    main_interpretations = plot_interpretations(agent, hist, selected_school_name, selected_school_id)
+                    for interp in main_interpretations:
+                        st.caption(interp)
+                    
+                    # Radar chart (enhanced)
                     latest = get_latest_survey(survey_df, selected_school_id)
                     if latest is not None:
                         radar = radar_chart(latest, selected_school_name)
                         st.plotly_chart(radar, use_container_width=True)
+                        st.caption("📝 The radar shows the current strength of each milestone-related variable. A balanced, high‑value shape indicates a healthy research culture.")
                     else:
                         st.info("No survey data for current quarter.")
                     
+                    # Research Outputs Dashboard (with interpretations inside)
                     with st.expander("📚 Research Outputs Dashboard (for selected school)"):
                         research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name)
                     
+                    # Cycle vs Research Outputs (with interpretation)
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id)
                     
+                    # Interpretation table (unchanged)
                     st.markdown(f"### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
                     outcome_table_html = f"""
                     <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; border: 1px solid {USTP_DARK_BLUE};">
@@ -530,6 +606,7 @@ if survey_file is not None and metadata_file is not None:
                     """
                     st.markdown(outcome_table_html, unsafe_allow_html=True)
                     
+                    # ---- Synthesized per‑school synopsis ----
                     rcsi_val = agent.running_total_outcome
                     intervals = [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]
                     level = "Exceptional"
@@ -546,23 +623,26 @@ if survey_file is not None and metadata_file is not None:
                     else:
                         sustainability = "The school is still in early stages of research culture development."
                     
+                    # Combine interpretations from main plots and dashboards into synopsis
+                    synopsis_details = " ".join(main_interpretations[:2])  # take first two for brevity
                     per_school_html = f"""
                     <div style="background-color: #E3F2FD; border-left: 5px solid {USTP_DARK_BLUE}; padding: 10px; border-radius: 5px; margin-top: 10px;">
                     <b>📌 School {selected_school_id} ({selected_school_name}) Synopsis:</b><br>
                     After {st.session_state.total_months} months: Milestone = {agent.current_milestone} | Completed cycles = {agent.cycle_count}<br>
                     Research Culture Sustainability Index (RCSI) = <b>{rcsi_val:.3f}</b> → <b>{level}</b> level.<br>
-                    <i>Research Sustainability Culture:</i> {sustainability}
+                    <i>Research Sustainability Culture:</i> {sustainability}<br>
+                    <i>Key indicators:</i> {synopsis_details}
                     </div>
                     """
                     st.markdown(per_school_html, unsafe_allow_html=True)
                     
+                    # ---- Division synopsis (unchanged but with corrected mutual exclusivity) ----
                     total_schools = len(st.session_state.sim.agents)
-                    early_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2 or a.cycle_count == 0)
-                    advanced_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4 or a.cycle_count >= 1)
-                    early_percent = (early_count / total_schools) * 100
-                    advanced_percent = (advanced_count / total_schools) * 100
+                    early_count = sum(1 for a in st.session_state.sim.agents if a.cycle_count == 0)
+                    advanced_count = total_schools - early_count
+                    early_percent = (early_count / total_schools) * 100 if total_schools > 0 else 0
+                    advanced_percent = (advanced_count / total_schools) * 100 if total_schools > 0 else 0
                     
-                    # Precise language for early stages
                     if early_percent == 100.0:
                         early_text = "All schools"
                     elif early_percent >= 75:
@@ -585,15 +665,14 @@ if survey_file is not None and metadata_file is not None:
                     else:
                         advanced_text = "No schools"
                     
-                    # Division sustainability interpretation based on early_percent
                     if early_percent == 0:
-                        sustainability_text = "All schools have moved beyond early stages; the division is showing strong research culture."
+                        sustainability_text = "All schools have completed at least one full cycle; the division is showing strong research culture."
                     elif early_percent <= 30:
-                        sustainability_text = "Only a few schools remain in early stages; the division is making good progress toward sustainability."
+                        sustainability_text = "Only a few schools have not yet completed a cycle; the division is making good progress toward sustainability."
                     elif early_percent <= 60:
-                        sustainability_text = "A moderate number of schools are still in early stages; targeted policy interventions may help."
+                        sustainability_text = "A moderate number of schools have not yet completed a cycle; targeted policy interventions may help."
                     else:
-                        sustainability_text = "The majority of schools are still in early stages of research culture development."
+                        sustainability_text = "The majority of schools have not yet completed a cycle; focus on building foundational research culture."
                     
                     total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
                     avg_rcsi = total_outcome / total_schools
@@ -605,7 +684,6 @@ if survey_file is not None and metadata_file is not None:
                     total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
                     avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
                     
-                    # Division-level utilisation rate
                     school_ids_in_sim = [agent.real_id for agent in st.session_state.sim.agents]
                     div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
                     total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
@@ -618,8 +696,8 @@ if survey_file is not None and metadata_file is not None:
                     Average milestone = {avg_milestone:.1f} | Total completed cycles across all schools = {total_cycles}<br>
                     Average RCSI = {avg_rcsi:.3f} → <b>{level_avg}</b> level.<br>
                     Average research utilisation rate across all schools = <b>{div_util_rate:.1f}%</b> (percentage of research outputs adopted into practice).<br>
-                    <i>Stage distribution:</i> {early_text} are in early stages (milestone ≤2 or no cycle).<br>
-                    {advanced_text} have reached advanced stages (milestone ≥4 or at least one cycle).<br>
+                    <i>Stage distribution:</i> {early_text} are in early stages (no cycle completed).<br>
+                    {advanced_text} have reached advanced stages (at least one cycle).<br>
                     <i>Division‑wide sustainability:</i> {sustainability_text}
                     </div>
                     """
@@ -631,7 +709,7 @@ if survey_file is not None and metadata_file is not None:
                         - **Milestone Progress:** The school moves through milestones 0–6. Reaching milestone 6 and cycling back indicates a full sustainable cycle.
                         - **Research Culture Sustainability Index (RCSI):** Cumulative strength of the research ecosystem, derived from Impact Realization (M) and Collaboration (P).
                         - **Improvement per Completed Cycle:** Each bar shows the RCSI contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
-                        - **Radar Chart:** Current snapshot of the seven variables – the ideal is a balanced, high‑value shape.
+                        - **Radar Chart:** Current snapshot of the seven milestone‑linked variables – the ideal is a balanced, high‑value shape.
                         - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, and teacher productivity.
                         - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
                         """, unsafe_allow_html=True)
