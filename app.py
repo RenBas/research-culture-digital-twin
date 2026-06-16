@@ -530,14 +530,16 @@ if survey_file is not None and metadata_file is not None:
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Division synopsis (with exact percentages and coherent assessment)
+                    # ---- Division synopsis (corrected: stages by milestone, not cycles) ----
                     total_schools = len(st.session_state.sim.agents)
-                    early_count = sum(1 for a in st.session_state.sim.agents if a.cycle_count == 0)
-                    advanced_count = total_schools - early_count
-                    early_percent = (early_count / total_schools) * 100 if total_schools > 0 else 0
-                    advanced_percent = (advanced_count / total_schools) * 100 if total_schools > 0 else 0
+                    early_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
+                    advanced_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
+                    transitional_count = total_schools - early_stage_count - advanced_stage_count
+                    early_percent = (early_stage_count / total_schools) * 100 if total_schools > 0 else 0
+                    advanced_percent = (advanced_stage_count / total_schools) * 100 if total_schools > 0 else 0
+                    transitional_percent = (transitional_count / total_schools) * 100 if total_schools > 0 else 0
 
-                    # Stage distribution texts with exact percentages
+                    # Early stages text
                     if early_percent == 100:
                         early_text = "All schools"
                     elif early_percent >= 75:
@@ -549,6 +551,7 @@ if survey_file is not None and metadata_file is not None:
                     else:
                         early_text = "No schools"
 
+                    # Advanced stages text
                     if advanced_percent == 100:
                         advanced_text = "All schools"
                     elif advanced_percent >= 75:
@@ -560,17 +563,17 @@ if survey_file is not None and metadata_file is not None:
                     else:
                         advanced_text = "No schools"
 
-                    # Sustainability assessment matching early_percent
+                    # Sustainability assessment based on early_percent (milestone ≤2)
                     if early_percent == 100:
-                        sustainability_text = "All schools have not yet completed a cycle; foundational capacity‑building is the priority to raise the division’s research culture."
+                        sustainability_text = "All schools are still in early milestones (M0–M2); foundational capacity‑building is the priority to advance the division’s research culture."
                     elif early_percent >= 75:
-                        sustainability_text = f"The vast majority ({early_percent:.1f}%) of schools have not yet completed a cycle; urgent capacity‑building interventions are needed."
+                        sustainability_text = f"The vast majority ({early_percent:.1f}%) of schools are in early milestones (M0–M2); urgent interventions are needed to move them into higher stages."
                     elif early_percent >= 50:
-                        sustainability_text = f"More than half ({early_percent:.1f}%) of schools have not yet completed a cycle; targeted policy support may accelerate progress."
+                        sustainability_text = f"More than half ({early_percent:.1f}%) of schools are in early milestones (M0–M2); targeted policy support may accelerate progress."
                     elif early_percent > 0:
-                        sustainability_text = f"{early_percent:.1f}% of schools have not yet completed a cycle; continued efforts are required."
+                        sustainability_text = f"{early_percent:.1f}% of schools remain in early milestones; continued efforts are required to reach sustainability."
                     else:
-                        sustainability_text = "All schools have completed at least one cycle; the division exhibits a strong, self‑sustaining research culture."
+                        sustainability_text = "No schools are in early milestones; the division exhibits a strong, advanced research culture across most schools."
 
                     total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
                     avg_rcsi = total_outcome / total_schools
@@ -590,10 +593,10 @@ if survey_file is not None and metadata_file is not None:
                     division_html = f"""
                     <div style="background-color: #E8F5E9; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px;">
                     <b>🏢 Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
-                    • Average milestone = {avg_milestone:.1f} | Total completed cycles = {total_cycles}<br>
+                    • Average milestone = {avg_milestone:.1f} | Total completed cycles across all schools = {total_cycles}<br>
                     • Average Research Culture Sustainability Index (RCSI) = <b>{avg_rcsi:.3f}</b> → <b>{level_avg}</b> level.<br>
                     • Average research utilisation rate = <b>{div_util_rate:.1f}%</b> (research adopted into practice).<br>
-                    • Stage distribution: {early_text} are in early stages (no cycle completed); {advanced_text} have reached advanced stages (≥1 cycle).<br>
+                    • Stage distribution: {early_text} are in early stages (milestone ≤2), {transitional_percent:.1f}% are at milestone 3 (transitional), and {advanced_text} are in advanced stages (milestone ≥4).<br>
                     <i>Division‑wide sustainability assessment:</i> {sustainability_text}
                     </div>
                     """
