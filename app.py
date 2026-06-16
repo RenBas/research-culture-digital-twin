@@ -123,7 +123,6 @@ def process_survey(survey_df):
     if survey_df is None:
         return None, None, "No survey file uploaded."
     try:
-        # Ensure required columns
         if 'school_id_no' not in survey_df.columns:
             if 'school_id' in survey_df.columns:
                 survey_df['school_id_no'] = survey_df['school_id'].astype(str).apply(lambda x: int(x.split('_')[-1]) if '_' in x else int(x))
@@ -131,7 +130,6 @@ def process_survey(survey_df):
                 return None, None, "Survey file must contain 'school_id_no' or 'school_id' column."
         if 'school_name' not in survey_df.columns:
             survey_df['school_name'] = survey_df['school_id_no'].apply(lambda x: f"School_{x}")
-        # Add month_num
         def month_str_to_num(month_str):
             try:
                 year = int(month_str[:4])
@@ -192,7 +190,9 @@ with st.sidebar:
         'u_collab': u_collab
     }
     
-    num_schools = st.number_input("Number of schools", min_value=1, max_value=200, value=20, step=1)
+    # Maximum schools set to 200
+    max_schools_allowed = 200
+    num_schools = st.number_input("Number of schools", min_value=1, max_value=max_schools_allowed, value=20, step=1)
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
     random_events = st.checkbox("Enable random events", value=False)
     use_survey = st.checkbox("Override with survey data", value=True)
@@ -363,7 +363,25 @@ if survey_file is not None and metadata_file is not None:
                     fig.update_yaxes(title_text="Improvement", row=2, col=2)
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Synopses
+                    # ---------------------------
+                    # Interpretation Table for Cumulative Student Outcome
+                    # ---------------------------
+                    st.markdown("### 📈 Cumulative Student Outcome Interpretation Table")
+                    outcome_table_html = """
+                    <table style="width:100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <tr style="background-color: #ddd;">
+                        <th>Range</th><th>Level</th><th>Description</th>
+                    </tr>
+                    <tr><td>0.0 – 0.2</td><td>Very Low</td><td>Little to no improvement in student learning outcomes.</td></tr>
+                    <tr><td>0.2 – 0.4</td><td>Low</td><td>Minimal improvement; research culture still weak.</td></tr>
+                    <tr><td>0.4 – 0.6</td><td>Moderate</td><td>Noticeable improvement; research culture developing.</td></tr>
+                    <tr><td>0.6 – 0.8</td><td>High</td><td>Strong improvement; research culture becoming sustainable.</td></tr>
+                    <tr><td>0.8 – 1.0</td><td>Very High</td><td>Excellent improvement; research culture fully embedded and impactful.</td></tr>
+                    </table>
+                    """
+                    st.markdown(outcome_table_html, unsafe_allow_html=True)
+                    
+                    # Synopses using the same intervals
                     outcome_val = agent.running_total_outcome
                     intervals = [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]
                     level = "Exceptional"
