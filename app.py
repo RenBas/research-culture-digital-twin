@@ -7,7 +7,6 @@ from plotly.subplots import make_subplots
 from dataclasses import dataclass
 from typing import List, Dict
 from datetime import datetime
-import math
 
 # ============================================================
 # USTP + DepEd Colour Palette
@@ -17,54 +16,22 @@ USTP_GOLD = "#F5A623"
 DEPED_RED = "#D32F2F"
 DEPED_MAROON = "#8B0000"
 LIGHT_BG = "#F8F9FA"
-DIVISION_GREEN = "#2E7D32"
 
-# Custom CSS for Streamlit
 st.markdown(f"""
 <style>
-    .reportview-container .main .block-container {{
-        padding-top: 2rem;
-    }}
-    h1, h2, h3, .stMarkdown h1, .stMarkdown h2 {{
-        color: {USTP_DARK_BLUE};
-    }}
-    .sidebar .sidebar-content {{
-        background-color: {LIGHT_BG};
-        border-right: 2px solid {USTP_GOLD};
-    }}
-    .stButton > button {{
-        background-color: {USTP_DARK_BLUE};
-        color: white;
-        border-radius: 5px;
-        border: none;
-        transition: 0.3s;
-    }}
-    .stButton > button:hover {{
-        background-color: {USTP_GOLD};
-        color: {USTP_DARK_BLUE};
-    }}
-    .stButton > button:focus {{
-        box-shadow: none;
-    }}
+    .reportview-container .main .block-container {{ padding-top: 2rem; }}
+    h1, h2, h3, .stMarkdown h1, .stMarkdown h2 {{ color: {USTP_DARK_BLUE}; }}
+    .sidebar .sidebar-content {{ background-color: {LIGHT_BG}; border-right: 2px solid {USTP_GOLD}; }}
+    .stButton > button {{ background-color: {USTP_DARK_BLUE}; color: white; border-radius: 5px; border: none; transition: 0.3s; }}
+    .stButton > button:hover {{ background-color: {USTP_GOLD}; color: {USTP_DARK_BLUE}; }}
+    .stButton > button:focus {{ box-shadow: none; }}
     div[data-testid="column"]:nth-of-type(2) .stButton > button,
-    div[data-testid="column"]:nth-of-type(3) .stButton > button {{
-        background-color: #6C757D;
-    }}
+    div[data-testid="column"]:nth-of-type(3) .stButton > button {{ background-color: #6C757D; }}
     div[data-testid="column"]:nth-of-type(2) .stButton > button:hover,
-    div[data-testid="column"]:nth-of-type(3) .stButton > button:hover {{
-        background-color: {USTP_GOLD};
-        color: {USTP_DARK_BLUE};
-    }}
-    .stSelectbox label, .stNumberInput label, .stCheckbox label {{
-        font-weight: 500;
-        color: {USTP_DARK_BLUE};
-    }}
-    .stDataFrame {{
-        border: 1px solid #ddd;
-    }}
-    .css-1y4p8pa {{
-        background-color: {LIGHT_BG};
-    }}
+    div[data-testid="column"]:nth-of-type(3) .stButton > button:hover {{ background-color: {USTP_GOLD}; color: {USTP_DARK_BLUE}; }}
+    .stSelectbox label, .stNumberInput label, .stCheckbox label {{ font-weight: 500; color: {USTP_DARK_BLUE}; }}
+    .stDataFrame {{ border: 1px solid #ddd; }}
+    .css-1y4p8pa {{ background-color: {LIGHT_BG}; }}
 </style>
 """, unsafe_allow_html=True)
 
@@ -178,7 +145,7 @@ class Simulation:
         return self.agents[idx]
 
 # ------------------------------------------------------------
-# Data processing functions (unchanged)
+# Data processing functions
 # ------------------------------------------------------------
 def process_survey(survey_df):
     if survey_df is None:
@@ -231,7 +198,6 @@ def get_latest_survey(survey_df, school_id):
     return school_data.sort_values('month_num').iloc[-1]
 
 def radar_chart(survey_row, school_name):
-    # Variables with milestone numbers
     variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
     value_map = {'R (M0)': survey_row['R'],
                  'A (M1)': survey_row['A'],
@@ -250,34 +216,17 @@ def radar_chart(survey_row, school_name):
         line_color=USTP_GOLD,
         fillcolor=f"rgba(245, 166, 35, 0.3)"
     ))
-    # Add a circular arrow around the outer rim (clockwise direction)
-    # Using a polar annotation with arrow? Actually we can add a path outside.
-    # Simpler: Add a "layout shape" – a circle with an arrow head.
-    # We'll add a circle just outside the radial axis (radius 1.05) and an arrow at the end.
-    # Instead of complex shape, we add an annotation with an arrow in the polar subplot.
-    # For clarity, we add a small arrow annotation at the top-right indicating direction.
-    # But the user requested a circular arrow around the outside. That is complex in Plotly.
-    # Alternative: Add a "direction" text with an arrow symbol.
-    # I'll add a text annotation with a circular arrow symbol (↻) near the title.
     fig.update_layout(
         polar=dict(
             radialaxis=dict(visible=True, range=[0, 1], color=USTP_DARK_BLUE),
-            angularaxis=dict(direction="clockwise")  # This makes the order of categories clockwise
+            angularaxis=dict(direction="clockwise")
         ),
         title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
         showlegend=False,
         font=dict(color=USTP_DARK_BLUE),
-        annotations=[
-            dict(
-                text="↻ Milestone cycle direction (clockwise)",
-                xref="paper", yref="paper",
-                x=0.9, y=1.05, showarrow=False,
-                font=dict(size=10, color=USTP_DARK_BLUE)
-            )
-        ]
+        annotations=[dict(text="↻ Milestone cycle direction (clockwise)", xref="paper", yref="paper",
+                         x=0.9, y=1.05, showarrow=False, font=dict(size=10, color=USTP_DARK_BLUE))]
     )
-    # Actually the polar axis direction "clockwise" already makes the order from 0 to 6 go clockwise.
-    # So we just add a small annotation.
     return fig
 
 def research_outputs_dashboard(metadata_df, school_id, school_name):
@@ -288,7 +237,6 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
     theme_counts = school_meta['theme'].value_counts().reset_index()
     theme_counts.columns = ['Theme', 'Count']
     fig_theme = px.bar(theme_counts, x='Theme', y='Count', title=f"Theme Distribution – {school_name}", color='Theme', color_discrete_sequence=[USTP_GOLD, DEPED_RED, USTP_DARK_BLUE])
-    fig_theme.update_layout(title="Theme Distribution")
     st.plotly_chart(fig_theme, use_container_width=True)
     if len(theme_counts) > 0:
         top_theme = theme_counts.iloc[0]['Theme']
@@ -297,7 +245,6 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
     status_counts = school_meta['status'].value_counts().reset_index()
     status_counts.columns = ['Status', 'Count']
     fig_status = px.bar(status_counts, x='Status', y='Count', title=f"Publication Status – {school_name}", color='Status', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_MAROON])
-    fig_status.update_layout(title="Publication Status")
     st.plotly_chart(fig_status, use_container_width=True)
     if not status_counts.empty:
         published = status_counts[status_counts['Status']=='published']['Count'].sum()
@@ -308,17 +255,13 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
     utilised = school_meta['utilized_by_school'].sum() if 'utilized_by_school' in school_meta.columns else 0
     total = len(school_meta)
     util_rate = (utilised / total * 100) if total > 0 else 0
-    st.metric(
-        label="📘 School‑level Research Utilisation Rate",
-        value=f"{util_rate:.1f}%",
-        help="Percentage of research outputs from this school that have been adopted into practice (e.g., new teaching strategies, policy changes)."
-    )
+    st.metric("📘 School‑level Research Utilisation Rate", f"{util_rate:.1f}%",
+              help="Percentage of research outputs from this school that have been adopted into practice (e.g., new teaching strategies, policy changes).")
     st.caption(f"📝 {'High utilisation indicates strong translation of research into practice.' if util_rate > 70 else 'Moderate or low utilisation suggests a gap between research production and practical adoption.'}")
     
     teacher_counts = school_meta['teacher_name'].value_counts().reset_index().head(10)
     teacher_counts.columns = ['Teacher', 'Number of Outputs']
     fig_teacher = px.bar(teacher_counts, x='Number of Outputs', y='Teacher', orientation='h', title=f"Teacher Productivity (Top 10) – {school_name}", color='Number of Outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
-    fig_teacher.update_layout(title="Teacher Productivity")
     st.plotly_chart(fig_teacher, use_container_width=True)
     if not teacher_counts.empty:
         st.caption(f"📝 The most productive teacher has {teacher_counts.iloc[0]['Number of Outputs']} research outputs. Encouraging collaborative research could further strengthen culture.")
@@ -326,7 +269,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
 def cycle_research_correlation(agent, metadata_df, school_id):
     if not agent.cycle_improvements:
         st.info("No cycles completed yet for this school.")
-        return None
+        return
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     def date_to_month_num(d):
         return (d.year - 2026) * 12 + d.month
@@ -336,21 +279,11 @@ def cycle_research_correlation(agent, metadata_df, school_id):
         num_outputs = len(school_meta[school_meta['month_num'] <= rec.completion_month])
         cumulative_outputs.append(num_outputs)
     fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=[c.cycle_number for c in agent.cycle_improvements],
-        y=cumulative_outputs,
-        mode='markers+lines',
-        marker=dict(size=10, color=USTP_GOLD),
-        line=dict(color=USTP_DARK_BLUE),
-        name='Research outputs'
-    ))
-    fig.update_layout(
-        title="Cycle vs Cumulative Research Outputs",
-        xaxis_title="Cycle Number",
-        yaxis_title="Number of Research Outputs (cumulative)",
-        showlegend=False,
-        font=dict(color=USTP_DARK_BLUE)
-    )
+    fig.add_trace(go.Scatter(x=[c.cycle_number for c in agent.cycle_improvements], y=cumulative_outputs,
+                             mode='markers+lines', marker=dict(size=10, color=USTP_GOLD),
+                             line=dict(color=USTP_DARK_BLUE), name='Research outputs'))
+    fig.update_layout(title="Cycle vs Cumulative Research Outputs", xaxis_title="Cycle Number",
+                      yaxis_title="Number of Research Outputs (cumulative)", showlegend=False, font=dict(color=USTP_DARK_BLUE))
     st.plotly_chart(fig, use_container_width=True)
     if len(cumulative_outputs) >= 2:
         increase = cumulative_outputs[-1] - cumulative_outputs[-2]
@@ -360,18 +293,6 @@ def cycle_research_correlation(agent, metadata_df, school_id):
             st.caption("📝 Research output growth has plateaued across cycles. Consider policies to revitalise research engagement.")
     elif len(cumulative_outputs) == 1:
         st.caption("📝 First cycle completed. Continued research output will be needed to build sustainability.")
-    return cumulative_outputs
-
-# ------------------------------------------------------------
-# Helper to generate key indicators for synopsis
-# ------------------------------------------------------------
-def get_key_indicators(agent, hist):
-    if not hist['R']:
-        return "No data yet."
-    latest_R = hist['R'][-1]
-    latest_M = hist['M'][-1]
-    final_milestone = agent.current_milestone
-    return f"Readiness (R) = {latest_R:.2f}, Impact (M) = {latest_M:.2f}; Milestone reached = {final_milestone}."
 
 # ------------------------------------------------------------
 # Streamlit UI
@@ -379,7 +300,6 @@ def get_key_indicators(agent, hist):
 st.set_page_config(page_title="7-Milestone Research Culture Sustainability Framework", layout="wide")
 st.markdown(f"<h1 style='text-align: center; color: {USTP_DARK_BLUE};'>7‑Milestone Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
 
-# Sidebar (same as before)
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Policy Levers & Simulation Controls</h2>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
@@ -390,59 +310,40 @@ with st.sidebar:
     with col2:
         u_lead = st.slider("Leadership commit.", 0.0, 1.0, 0.5, 0.05)
         u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05)
-    
-    levers = {
-        'u_train': u_train,
-        'u_mentor': u_mentor,
-        'u_budget': u_budget,
-        'u_lead': u_lead,
-        'u_collab': u_collab
-    }
-    
+    levers = {'u_train': u_train, 'u_mentor': u_mentor, 'u_budget': u_budget, 'u_lead': u_lead, 'u_collab': u_collab}
     max_schools_allowed = 200
     num_schools = st.number_input("Number of schools", min_value=1, max_value=max_schools_allowed, value=20, step=1)
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
     random_events = st.checkbox("Enable random events", value=False)
     use_survey = st.checkbox("Override with survey data", value=True)
-    
     col_buttons = st.columns(3)
-    with col_buttons[0]:
-        run_btn = st.button("Run", use_container_width=True)
-    with col_buttons[1]:
-        step_btn = st.button("Step (1 month)", use_container_width=True)
-    with col_buttons[2]:
-        reset_btn = st.button("Reset", use_container_width=True)
-    
+    with col_buttons[0]: run_btn = st.button("Run", use_container_width=True)
+    with col_buttons[1]: step_btn = st.button("Step (1 month)", use_container_width=True)
+    with col_buttons[2]: reset_btn = st.button("Reset", use_container_width=True)
     export_btn = st.button("Export results (CSV)", use_container_width=True)
-    
     st.markdown("---")
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Data Upload</h3>", unsafe_allow_html=True)
     survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
     metadata_file = st.file_uploader("Upload research metadata (CSV)", type=["csv"], key="metadata")
 
-# Main area
 if survey_file is not None and metadata_file is not None:
     try:
         survey_df = pd.read_csv(survey_file)
         metadata_df = pd.read_csv(metadata_file)
-        
         survey_df, school_info, survey_error = process_survey(survey_df)
         metadata_df, meta_error = process_metadata(metadata_df)
-        
         if survey_error:
             st.error(f"Survey error: {survey_error}")
         elif meta_error:
             st.error(f"Metadata error: {meta_error}")
         else:
             st.success(f"Loaded {len(school_info)} schools.")
-            
             if 'sim' not in st.session_state:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 st.session_state.current_month = 0
                 st.session_state.total_months = 0
                 school_ids = school_info['school_id_no'].head(num_schools).tolist()
-                st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]}
-                                            for sid in school_ids}
+                st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
                 for idx, agent in enumerate(st.session_state.sim.agents):
                     agent.real_id = school_ids[idx]
                 for agent in st.session_state.sim.agents:
@@ -451,13 +352,11 @@ if survey_file is not None and metadata_file is not None:
                     agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
                     agent.C = min(1.0, agent.C + len(school_metadata[school_metadata['document_type']=='full_paper'])*0.005)
                     agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
-            
             school_ids = school_info['school_id_no'].head(num_schools).tolist()
             school_options = [f"ID {sid}: {school_info[school_info['school_id_no']==sid]['school_name'].values[0]}" for sid in school_ids]
             selected_school_label = st.selectbox("Select school", school_options, index=0)
             selected_school_id = int(selected_school_label.split(":")[0].split()[1])
             selected_school_name = school_info[school_info['school_id_no']==selected_school_id]['school_name'].values[0]
-            
             st.markdown("### Research Outputs (Recent)")
             df_show = metadata_df[metadata_df['school_id_no'] == selected_school_id].copy()
             if not df_show.empty:
@@ -466,7 +365,7 @@ if survey_file is not None and metadata_file is not None:
             else:
                 st.info("No research outputs for this school.")
             
-            # Simulation actions (run, step, reset)
+            # Simulation actions
             if run_btn:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
@@ -479,8 +378,7 @@ if survey_file is not None and metadata_file is not None:
                     agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
                 st.session_state.current_month = 0
                 st.session_state.total_months = 0
-                st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]}
-                                            for sid in school_ids}
+                st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
                 for m in range(1, duration+1):
                     if use_survey:
                         for agent in st.session_state.sim.agents:
@@ -532,15 +430,14 @@ if survey_file is not None and metadata_file is not None:
                     agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
                 st.session_state.current_month = 0
                 st.session_state.total_months = 0
-                st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]}
-                                            for sid in school_ids}
+                st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
                 st.rerun()
             
             if st.session_state.total_months > 0:
                 hist = st.session_state.history.get(selected_school_id, None)
                 agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
                 if hist and agent:
-                    # Main plots (same as before)
+                    # Main plots
                     fig1 = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress", "Research Culture Sustainability Index (RCSI)", "Improvement per Completed Cycle"))
                     colors = ['#1E88E5', USTP_GOLD, '#8E44AD', '#2ECC71', '#E67E22', DEPED_RED, '#1ABC9C']
                     vars_ = ['R','A','C','S','I','P','M']
@@ -565,19 +462,15 @@ if survey_file is not None and metadata_file is not None:
                     fig1.update_yaxes(title_text="RCSI", row=2, col=2)
                     st.plotly_chart(fig1, use_container_width=True)
                     
-                    # Radar chart (with direction annotation)
+                    # Radar chart
                     latest = get_latest_survey(survey_df, selected_school_id)
                     if latest is not None:
-                        radar = radar_chart(latest, selected_school_name)
-                        st.plotly_chart(radar, use_container_width=True)
+                        st.plotly_chart(radar_chart(latest, selected_school_name), use_container_width=True)
                     else:
                         st.info("No survey data for current quarter.")
                     
-                    # Research Outputs Dashboard
                     with st.expander("📚 Research Outputs Dashboard (for selected school)"):
                         research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name)
-                    
-                    # Cycle vs Research Outputs
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id)
                     
@@ -585,9 +478,7 @@ if survey_file is not None and metadata_file is not None:
                     st.markdown(f"### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
                     outcome_table_html = f"""
                     <table style="width:100%; border-collapse: collapse; margin-bottom: 20px; border: 1px solid {USTP_DARK_BLUE};">
-                    <tr style="background-color: {USTP_DARK_BLUE}; color: white;">
-                        <th>RCSI Range</th><th>Level</th><th>Description</th>
-                    </tr>
+                    <tr style="background-color: {USTP_DARK_BLUE}; color: white;"><th>RCSI Range</th><th>Level</th><th>Description</th></tr>
                     <tr><td>0.0 – 0.2</td><td>Very Low</td><td>Little to no accumulated research culture strength.</td></tr>
                     <tr><td>0.2 – 0.4</td><td>Low</td><td>Minimal ecosystem vitality; research culture still weak.</td></tr>
                     <tr><td>0.4 – 0.6</td><td>Moderate</td><td>Noticeable strength; research culture developing.</td></tr>
@@ -597,28 +488,19 @@ if survey_file is not None and metadata_file is not None:
                     """
                     st.markdown(outcome_table_html, unsafe_allow_html=True)
                     
-                    # ---- Enhanced per‑school synopsis with logical coherence ----
+                    # ---- Enhanced per‑school synopsis (corrected) ----
                     rcsi_val = agent.running_total_outcome
-                    intervals = [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]
                     rcsi_level = "Exceptional"
-                    for low,high,lev in intervals:
+                    for low,high,lev in [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]:
                         if low <= rcsi_val < high:
                             rcsi_level = lev
                             break
-                    
-                    # Milestone name mapping
-                    milestone_names = {
-                        0: "Milestone 0 (Readiness and Relevance)",
-                        1: "Milestone 1 (Awareness to Action)",
-                        2: "Milestone 2 (Capacity Spark)",
-                        3: "Milestone 3 (Structured Support)",
-                        4: "Milestone 4 (Institutional Anchoring)",
-                        5: "Milestone 5 (Community of Practice)",
-                        6: "Milestone 6 (Impact Realization)"
-                    }
+                    milestone_names = {0:"Milestone 0 (Readiness and Relevance)",1:"Milestone 1 (Awareness to Action)",
+                                       2:"Milestone 2 (Capacity Spark)",3:"Milestone 3 (Structured Support)",
+                                       4:"Milestone 4 (Institutional Anchoring)",5:"Milestone 5 (Community of Practice)",
+                                       6:"Milestone 6 (Impact Realization)"}
                     milestone_name = milestone_names.get(agent.current_milestone, f"Milestone {agent.current_milestone}")
                     
-                    # Build coherent narrative
                     if agent.cycle_count >= 2:
                         cycle_part = f"has completed {agent.cycle_count} full cycles, indicating a self‑sustaining research culture where cyclical improvement is institutionalized."
                     elif agent.cycle_count == 1:
@@ -635,7 +517,6 @@ if survey_file is not None and metadata_file is not None:
                     else:
                         milestone_part = "is realising tangible impact and is approaching or has achieved cyclical sustainability."
                     
-                    # Key indicators from variable evolution
                     key_R = hist['R'][-1] if hist['R'] else 0
                     key_M = hist['M'][-1] if hist['M'] else 0
                     key_milestone = agent.current_milestone
@@ -645,48 +526,32 @@ if survey_file is not None and metadata_file is not None:
                     The school’s Research Culture Sustainability Index (RCSI) is <b>{rcsi_val:.3f}</b>, which falls into the <b>{rcsi_level}</b> level. 
                     Key indicators: Readiness (R) = {key_R:.2f}, Impact (M) = {key_M:.2f}, and current Milestone = {key_milestone}. 
                     This combination suggests that {milestone_part} 
-                    The RCSI level {rcsi_level.lower()} reinforces this assessment: a {rcsi_level.lower()} score indicates {dict(intervals).get(rcsi_level, 'a specific stage')}.
+                    The RCSI level <b>{rcsi_level.lower()}</b> reinforces this assessment: a {rcsi_level.lower()} score indicates the overall health of the research ecosystem.
                     Overall, the school is on a path toward research culture sustainability, but further policy support may be needed to accelerate cycle completion.
                     """
-                    
-                    per_school_html = f"""
+                    st.markdown(f"""
                     <div style="background-color: #E3F2FD; border-left: 5px solid {USTP_DARK_BLUE}; padding: 10px; border-radius: 5px; margin-top: 10px;">
                     <b>📌 School {selected_school_id} ({selected_school_name}) – Sustainability Synopsis</b><br>
                     {coherent_text}
                     </div>
-                    """
-                    st.markdown(per_school_html, unsafe_allow_html=True)
+                    """, unsafe_allow_html=True)
                     
-                    # ---- Division‑level synopsis with coherence ----
+                    # Division synopsis
                     total_schools = len(st.session_state.sim.agents)
                     early_count = sum(1 for a in st.session_state.sim.agents if a.cycle_count == 0)
                     advanced_count = total_schools - early_count
                     early_percent = (early_count / total_schools) * 100 if total_schools > 0 else 0
                     advanced_percent = (advanced_count / total_schools) * 100 if total_schools > 0 else 0
                     
-                    if early_percent == 100.0:
-                        early_text = "All schools"
-                    elif early_percent >= 75:
-                        early_text = "The vast majority of schools"
-                    elif early_percent >= 50:
-                        early_text = "More than half of schools"
-                    elif early_percent > 0:
-                        early_text = f"{early_percent:.1f}% of schools"
-                    else:
-                        early_text = "No schools"
+                    early_text = ("All schools" if early_percent == 100 else
+                                 ("The vast majority of schools" if early_percent >= 75 else
+                                 ("More than half of schools" if early_percent >= 50 else
+                                 (f"{early_percent:.1f}% of schools" if early_percent > 0 else "No schools"))))
+                    advanced_text = ("All schools" if advanced_percent == 100 else
+                                    ("The vast majority of schools" if advanced_percent >= 75 else
+                                    ("More than half of schools" if advanced_percent >= 50 else
+                                    (f"{advanced_percent:.1f}% of schools" if advanced_percent > 0 else "No schools"))))
                     
-                    if advanced_percent == 100.0:
-                        advanced_text = "All schools"
-                    elif advanced_percent >= 75:
-                        advanced_text = "The vast majority of schools"
-                    elif advanced_percent >= 50:
-                        advanced_text = "More than half of schools"
-                    elif advanced_percent > 0:
-                        advanced_text = f"{advanced_percent:.1f}% of schools"
-                    else:
-                        advanced_text = "No schools"
-                    
-                    # Sustainability interpretation for division
                     if early_percent == 0:
                         sustainability_text = "All schools have completed at least one full cycle; the division exhibits a strong, self‑sustaining research culture."
                     elif early_percent <= 30:
@@ -699,13 +564,12 @@ if survey_file is not None and metadata_file is not None:
                     total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
                     avg_rcsi = total_outcome / total_schools
                     level_avg = "Exceptional"
-                    for low,high,lev in intervals:
+                    for low,high,lev in [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]:
                         if low <= avg_rcsi < high:
                             level_avg = lev
                             break
                     total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
                     avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
-                    
                     school_ids_in_sim = [agent.real_id for agent in st.session_state.sim.agents]
                     div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
                     total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
@@ -725,7 +589,7 @@ if survey_file is not None and metadata_file is not None:
                     st.markdown(division_html, unsafe_allow_html=True)
                     
                     with st.expander("📊 Graph Interpretations"):
-                        st.markdown(f"""
+                        st.markdown("""
                         - **Variable Evolution:** Shows how R, A, C, S, I, P, M change over time. Higher values (closer to 1) mean stronger readiness, awareness, capacity, etc.
                         - **Milestone Progress:** The school moves through milestones 0–6. Reaching milestone 6 and cycling back indicates a full sustainable cycle.
                         - **Research Culture Sustainability Index (RCSI):** Cumulative strength of the research ecosystem, derived from Impact Realization (M) and Collaboration (P).
@@ -733,15 +597,14 @@ if survey_file is not None and metadata_file is not None:
                         - **Radar Chart:** Current snapshot of the seven milestone‑linked variables – the ideal is a balanced, high‑value shape.
                         - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, and teacher productivity.
                         - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
-                        """, unsafe_allow_html=True)
+                        """)
             
             if export_btn:
                 all_data = []
                 for agent in st.session_state.sim.agents:
                     h = st.session_state.history[agent.real_id]
                     for t in range(len(h['month'])):
-                        row = {'school_id': agent.real_id, 'month': h['month'][t], 'milestone': h['milestone'][t],
-                               'running_outcome': h['running_outcome'][t]}
+                        row = {'school_id': agent.real_id, 'month': h['month'][t], 'milestone': h['milestone'][t], 'running_outcome': h['running_outcome'][t]}
                         for var in ['R','A','C','S','I','P','M']:
                             row[var] = h[var][t]
                         all_data.append(row)
@@ -752,11 +615,8 @@ if survey_file is not None and metadata_file is not None:
                         cycle_records.append({'school_id': agent.real_id, 'cycle_number': rec.cycle_number,
                                               'total_improvement': rec.total_improvement, 'completion_month': rec.completion_month})
                 df_cycles = pd.DataFrame(cycle_records)
-                csv1 = df_hist.to_csv(index=False).encode('utf-8')
-                csv2 = df_cycles.to_csv(index=False).encode('utf-8')
-                st.download_button("Download simulation history", csv1, "simulation_history.csv", "text/csv")
-                st.download_button("Download cycle improvements", csv2, "cycle_improvements.csv", "text/csv")
-                
+                st.download_button("Download simulation history", df_hist.to_csv(index=False).encode('utf-8'), "simulation_history.csv", "text/csv")
+                st.download_button("Download cycle improvements", df_cycles.to_csv(index=False).encode('utf-8'), "cycle_improvements.csv", "text/csv")
     except Exception as e:
         st.error(f"An error occurred: {str(e)}")
 else:
