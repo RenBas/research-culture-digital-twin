@@ -6,7 +6,6 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 from dataclasses import dataclass
 from typing import List, Dict
-from datetime import datetime
 
 # ============================================================
 # USTP + DepEd Colour Palette
@@ -241,7 +240,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
     if len(theme_counts) > 0:
         top_theme = theme_counts.iloc[0]['Theme']
         st.caption(f"📝 Research outputs are most concentrated in '{top_theme}'. This suggests the school’s research focus area.")
-    
+
     status_counts = school_meta['status'].value_counts().reset_index()
     status_counts.columns = ['Status', 'Count']
     fig_status = px.bar(status_counts, x='Status', y='Count', title=f"Publication Status – {school_name}", color='Status', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_MAROON])
@@ -251,14 +250,14 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
         total = status_counts['Count'].sum()
         pub_rate = (published/total*100) if total>0 else 0
         st.caption(f"📝 {pub_rate:.1f}% of research outputs are published. A higher publication rate often correlates with greater institutional recognition.")
-    
+
     utilised = school_meta['utilized_by_school'].sum() if 'utilized_by_school' in school_meta.columns else 0
     total = len(school_meta)
     util_rate = (utilised / total * 100) if total > 0 else 0
     st.metric("📘 School‑level Research Utilisation Rate", f"{util_rate:.1f}%",
               help="Percentage of research outputs from this school that have been adopted into practice (e.g., new teaching strategies, policy changes).")
     st.caption(f"📝 {'High utilisation indicates strong translation of research into practice.' if util_rate > 70 else 'Moderate or low utilisation suggests a gap between research production and practical adoption.'}")
-    
+
     teacher_counts = school_meta['teacher_name'].value_counts().reset_index().head(10)
     teacher_counts.columns = ['Teacher', 'Number of Outputs']
     fig_teacher = px.bar(teacher_counts, x='Number of Outputs', y='Teacher', orientation='h', title=f"Teacher Productivity (Top 10) – {school_name}", color='Number of Outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
@@ -461,19 +460,19 @@ if survey_file is not None and metadata_file is not None:
                     fig1.update_xaxes(title_text="Cycle Number", row=2, col=2)
                     fig1.update_yaxes(title_text="RCSI", row=2, col=2)
                     st.plotly_chart(fig1, use_container_width=True)
-                    
+
                     # Radar chart
                     latest = get_latest_survey(survey_df, selected_school_id)
                     if latest is not None:
                         st.plotly_chart(radar_chart(latest, selected_school_name), use_container_width=True)
                     else:
                         st.info("No survey data for current quarter.")
-                    
+
                     with st.expander("📚 Research Outputs Dashboard (for selected school)"):
                         research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name)
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id)
-                    
+
                     # RCSI interpretation table
                     st.markdown(f"### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
                     outcome_table_html = f"""
@@ -487,8 +486,8 @@ if survey_file is not None and metadata_file is not None:
                     </table>
                     """
                     st.markdown(outcome_table_html, unsafe_allow_html=True)
-                    
-                    # ---- Enhanced per‑school synopsis (corrected) ----
+
+                    # Per‑school synopsis (coherent)
                     rcsi_val = agent.running_total_outcome
                     rcsi_level = "Exceptional"
                     for low,high,lev in [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]:
@@ -500,14 +499,12 @@ if survey_file is not None and metadata_file is not None:
                                        4:"Milestone 4 (Institutional Anchoring)",5:"Milestone 5 (Community of Practice)",
                                        6:"Milestone 6 (Impact Realization)"}
                     milestone_name = milestone_names.get(agent.current_milestone, f"Milestone {agent.current_milestone}")
-                    
                     if agent.cycle_count >= 2:
                         cycle_part = f"has completed {agent.cycle_count} full cycles, indicating a self‑sustaining research culture where cyclical improvement is institutionalized."
                     elif agent.cycle_count == 1:
                         cycle_part = "has completed one full cycle, demonstrating initial sustainability but may need further reinforcement."
                     else:
                         cycle_part = "has not yet completed any full cycle, meaning the research culture is still in early formation and has not achieved cyclical momentum."
-                    
                     if agent.current_milestone == 0:
                         milestone_part = "is at the very beginning of the journey."
                     elif agent.current_milestone <= 2:
@@ -516,15 +513,12 @@ if survey_file is not None and metadata_file is not None:
                         milestone_part = "has established structured support and is embedding research into institutional practice."
                     else:
                         milestone_part = "is realising tangible impact and is approaching or has achieved cyclical sustainability."
-                    
                     key_R = hist['R'][-1] if hist['R'] else 0
                     key_M = hist['M'][-1] if hist['M'] else 0
-                    key_milestone = agent.current_milestone
-                    
                     coherent_text = f"""
                     After {st.session_state.total_months} months, {selected_school_name} (ID {selected_school_id}) has reached {milestone_name} and {cycle_part} 
                     The school’s Research Culture Sustainability Index (RCSI) is <b>{rcsi_val:.3f}</b>, which falls into the <b>{rcsi_level}</b> level. 
-                    Key indicators: Readiness (R) = {key_R:.2f}, Impact (M) = {key_M:.2f}, and current Milestone = {key_milestone}. 
+                    Key indicators: Readiness (R) = {key_R:.2f}, Impact (M) = {key_M:.2f}, and current Milestone = {agent.current_milestone}. 
                     This combination suggests that {milestone_part} 
                     The RCSI level <b>{rcsi_level.lower()}</b> reinforces this assessment: a {rcsi_level.lower()} score indicates the overall health of the research ecosystem.
                     Overall, the school is on a path toward research culture sustainability, but further policy support may be needed to accelerate cycle completion.
@@ -535,32 +529,49 @@ if survey_file is not None and metadata_file is not None:
                     {coherent_text}
                     </div>
                     """, unsafe_allow_html=True)
-                    
-                    # Division synopsis
+
+                    # Division synopsis (with exact percentages and coherent assessment)
                     total_schools = len(st.session_state.sim.agents)
                     early_count = sum(1 for a in st.session_state.sim.agents if a.cycle_count == 0)
                     advanced_count = total_schools - early_count
                     early_percent = (early_count / total_schools) * 100 if total_schools > 0 else 0
                     advanced_percent = (advanced_count / total_schools) * 100 if total_schools > 0 else 0
-                    
-                    early_text = ("All schools" if early_percent == 100 else
-                                 ("The vast majority of schools" if early_percent >= 75 else
-                                 ("More than half of schools" if early_percent >= 50 else
-                                 (f"{early_percent:.1f}% of schools" if early_percent > 0 else "No schools"))))
-                    advanced_text = ("All schools" if advanced_percent == 100 else
-                                    ("The vast majority of schools" if advanced_percent >= 75 else
-                                    ("More than half of schools" if advanced_percent >= 50 else
-                                    (f"{advanced_percent:.1f}% of schools" if advanced_percent > 0 else "No schools"))))
-                    
-                    if early_percent == 0:
-                        sustainability_text = "All schools have completed at least one full cycle; the division exhibits a strong, self‑sustaining research culture."
-                    elif early_percent <= 30:
-                        sustainability_text = "Only a few schools have not yet completed a cycle; the division is making excellent progress toward widespread sustainability."
-                    elif early_percent <= 60:
-                        sustainability_text = "A moderate number of schools still lack any completed cycle; targeted policy interventions could accelerate overall division sustainability."
+
+                    # Stage distribution texts with exact percentages
+                    if early_percent == 100:
+                        early_text = "All schools"
+                    elif early_percent >= 75:
+                        early_text = f"The vast majority of schools ({early_percent:.1f}%)"
+                    elif early_percent >= 50:
+                        early_text = f"More than half of schools ({early_percent:.1f}%)"
+                    elif early_percent > 0:
+                        early_text = f"{early_percent:.1f}% of schools"
                     else:
-                        sustainability_text = "The majority of schools have not yet completed a cycle; foundational capacity‑building should be the priority to raise the division’s research culture."
-                    
+                        early_text = "No schools"
+
+                    if advanced_percent == 100:
+                        advanced_text = "All schools"
+                    elif advanced_percent >= 75:
+                        advanced_text = f"The vast majority of schools ({advanced_percent:.1f}%)"
+                    elif advanced_percent >= 50:
+                        advanced_text = f"More than half of schools ({advanced_percent:.1f}%)"
+                    elif advanced_percent > 0:
+                        advanced_text = f"{advanced_percent:.1f}% of schools"
+                    else:
+                        advanced_text = "No schools"
+
+                    # Sustainability assessment matching early_percent
+                    if early_percent == 100:
+                        sustainability_text = "All schools have not yet completed a cycle; foundational capacity‑building is the priority to raise the division’s research culture."
+                    elif early_percent >= 75:
+                        sustainability_text = f"The vast majority ({early_percent:.1f}%) of schools have not yet completed a cycle; urgent capacity‑building interventions are needed."
+                    elif early_percent >= 50:
+                        sustainability_text = f"More than half ({early_percent:.1f}%) of schools have not yet completed a cycle; targeted policy support may accelerate progress."
+                    elif early_percent > 0:
+                        sustainability_text = f"{early_percent:.1f}% of schools have not yet completed a cycle; continued efforts are required."
+                    else:
+                        sustainability_text = "All schools have completed at least one cycle; the division exhibits a strong, self‑sustaining research culture."
+
                     total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
                     avg_rcsi = total_outcome / total_schools
                     level_avg = "Exceptional"
@@ -575,7 +586,7 @@ if survey_file is not None and metadata_file is not None:
                     total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
                     total_research_outputs = len(div_metadata)
                     div_util_rate = (total_utilised / total_research_outputs * 100) if total_research_outputs > 0 else 0
-                    
+
                     division_html = f"""
                     <div style="background-color: #E8F5E9; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px;">
                     <b>🏢 Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
@@ -587,7 +598,7 @@ if survey_file is not None and metadata_file is not None:
                     </div>
                     """
                     st.markdown(division_html, unsafe_allow_html=True)
-                    
+
                     with st.expander("📊 Graph Interpretations"):
                         st.markdown("""
                         - **Variable Evolution:** Shows how R, A, C, S, I, P, M change over time. Higher values (closer to 1) mean stronger readiness, awareness, capacity, etc.
@@ -598,7 +609,7 @@ if survey_file is not None and metadata_file is not None:
                         - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, and teacher productivity.
                         - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
                         """)
-            
+
             if export_btn:
                 all_data = []
                 for agent in st.session_state.sim.agents:
