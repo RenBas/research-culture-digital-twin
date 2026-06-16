@@ -294,6 +294,27 @@ def cycle_research_correlation(agent, metadata_df, school_id):
         st.caption("📝 First cycle completed. Continued research output will be needed to build sustainability.")
 
 # ------------------------------------------------------------
+# Helper for average milestone interpretation (ranges)
+# ------------------------------------------------------------
+def interpret_avg_milestone(avg_milestone):
+    if avg_milestone < 0.5:
+        return f"{avg_milestone:.1f} → at or near Milestone 0 (Readiness and Relevance), just starting the journey."
+    elif avg_milestone < 1.5:
+        return f"{avg_milestone:.1f} → between M0 and M1, approaching M1 (Awareness to Action)"
+    elif avg_milestone < 2.5:
+        return f"{avg_milestone:.1f} → between M1 and M2 (Capacity Spark)"
+    elif avg_milestone < 3.5:
+        return f"{avg_milestone:.1f} → between M2 and M3 (Structured Support)"
+    elif avg_milestone < 4.5:
+        return f"{avg_milestone:.1f} → between M3 and M4 (Institutional Anchoring)"
+    elif avg_milestone < 5.5:
+        return f"{avg_milestone:.1f} → between M4 and M5 (Community of Practice)"
+    elif avg_milestone < 6.5:
+        return f"{avg_milestone:.1f} → between M5 and M6 (Impact Realization)"
+    else:
+        return f"{avg_milestone:.1f} → at or beyond Milestone 6 (Impact Realization), indicating a mature, self‑sustaining research culture."
+
+# ------------------------------------------------------------
 # Streamlit UI
 # ------------------------------------------------------------
 st.set_page_config(page_title="7-Milestone Research Culture Sustainability Framework", layout="wide")
@@ -530,7 +551,7 @@ if survey_file is not None and metadata_file is not None:
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # ---- Division synopsis (corrected: stages by milestone, not cycles) ----
+                    # ---- Division synopsis (corrected with average milestone interpretation) ----
                     total_schools = len(st.session_state.sim.agents)
                     early_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
                     advanced_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
@@ -584,6 +605,7 @@ if survey_file is not None and metadata_file is not None:
                             break
                     total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
                     avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
+                    avg_milestone_interpretation = interpret_avg_milestone(avg_milestone)
                     school_ids_in_sim = [agent.real_id for agent in st.session_state.sim.agents]
                     div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
                     total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
@@ -593,7 +615,8 @@ if survey_file is not None and metadata_file is not None:
                     division_html = f"""
                     <div style="background-color: #E8F5E9; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px;">
                     <b>🏢 Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
-                    • Average milestone = {avg_milestone:.1f} | Total completed cycles across all schools = {total_cycles}<br>
+                    • Average milestone = {avg_milestone:.1f} → {avg_milestone_interpretation}<br>
+                    • Total completed cycles across all schools = {total_cycles}<br>
                     • Average Research Culture Sustainability Index (RCSI) = <b>{avg_rcsi:.3f}</b> → <b>{level_avg}</b> level.<br>
                     • Average research utilisation rate = <b>{div_util_rate:.1f}%</b> (research adopted into practice).<br>
                     • Stage distribution: {early_text} are in early stages (milestone ≤2), {transitional_percent:.1f}% are at milestone 3 (transitional), and {advanced_text} are in advanced stages (milestone ≥4).<br>
