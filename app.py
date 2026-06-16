@@ -262,10 +262,17 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
     status_counts = school_meta['status'].value_counts().reset_index()
     status_counts.columns = ['Status', 'Count']
     fig_status = px.bar(status_counts, x='Status', y='Count', title=f"Publication Status – {school_name}", color='Status', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_MAROON])
+    
+    # School-level utilisation rate with tooltip
     utilised = school_meta['utilized_by_school'].sum() if 'utilized_by_school' in school_meta.columns else 0
     total = len(school_meta)
     util_rate = (utilised / total * 100) if total > 0 else 0
-    st.metric("Research Utilisation Rate", f"{util_rate:.1f}%")
+    st.metric(
+        label="📘 School‑level Research Utilisation Rate",
+        value=f"{util_rate:.1f}%",
+        help="Percentage of research outputs from this school that have been adopted into practice (e.g., new teaching strategies, policy changes)."
+    )
+    
     teacher_counts = school_meta['teacher_name'].value_counts().reset_index().head(10)
     teacher_counts.columns = ['Teacher', 'Number of Outputs']
     fig_teacher = px.bar(teacher_counts, x='Number of Outputs', y='Teacher', orientation='h', title=f"Teacher Productivity (Top 10) – {school_name}", color='Number of Outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
@@ -304,7 +311,7 @@ def cycle_research_correlation(agent, metadata_df, school_id):
     st.plotly_chart(fig, use_container_width=True)
 
 # ------------------------------------------------------------
-# Streamlit UI (coloured with new title)
+# Streamlit UI (coloured, final)
 # ------------------------------------------------------------
 st.set_page_config(page_title="7-Milestone Research Culture Sustainability Framework", layout="wide")
 st.markdown(f"<h1 style='text-align: center; color: {USTP_DARK_BLUE};'>7‑Milestone Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
@@ -470,7 +477,7 @@ if survey_file is not None and metadata_file is not None:
                 hist = st.session_state.history.get(selected_school_id, None)
                 agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
                 if hist and agent:
-                    # Main plots with colours
+                    # Main plots
                     fig1 = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress", "Research Culture Sustainability Index (RCSI)", "Improvement per Completed Cycle"))
                     colors = ['#1E88E5', USTP_GOLD, '#8E44AD', '#2ECC71', '#E67E22', DEPED_RED, '#1ABC9C']
                     vars_ = ['R','A','C','S','I','P','M']
@@ -598,11 +605,19 @@ if survey_file is not None and metadata_file is not None:
                     total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
                     avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
                     
+                    # Division-level utilisation rate
+                    school_ids_in_sim = [agent.real_id for agent in st.session_state.sim.agents]
+                    div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
+                    total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
+                    total_research_outputs = len(div_metadata)
+                    div_util_rate = (total_utilised / total_research_outputs * 100) if total_research_outputs > 0 else 0
+                    
                     division_html = f"""
                     <div style="background-color: #E8F5E9; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px;">
                     <b>🏢 Division‑Level Synopsis (all {total_schools} schools):</b><br>
                     Average milestone = {avg_milestone:.1f} | Total completed cycles across all schools = {total_cycles}<br>
                     Average RCSI = {avg_rcsi:.3f} → <b>{level_avg}</b> level.<br>
+                    Average research utilisation rate across all schools = <b>{div_util_rate:.1f}%</b> (percentage of research outputs adopted into practice).<br>
                     <i>Stage distribution:</i> {early_text} are in early stages (milestone ≤2 or no cycle).<br>
                     {advanced_text} have reached advanced stages (milestone ≥4 or at least one cycle).<br>
                     <i>Division‑wide sustainability:</i> {sustainability_text}
