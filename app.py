@@ -214,7 +214,7 @@ def radar_chart(survey_row, school_name):
     # Create figure
     fig = go.Figure()
 
-    # ---- 1. Main radar trace (fill) ----
+    # ---- 1. Main radar trace ----
     fig.add_trace(go.Scatterpolar(
         r=values,
         theta=variables,
@@ -224,9 +224,9 @@ def radar_chart(survey_row, school_name):
         fillcolor=f"rgba(245, 166, 35, 0.3)"
     ))
 
-    # ---- 2. Circular arrow (dashed circle + arrowhead) ----
-    # Circle at r=1.0
+    # ---- 2. Circular arrow ----
     angles_deg = np.linspace(0, 360, 100)
+    # Circle at r=1.0
     fig.add_trace(go.Scatterpolar(
         r=[1.0] * len(angles_deg),
         theta=angles_deg,
@@ -235,8 +235,7 @@ def radar_chart(survey_row, school_name):
         showlegend=False,
         hoverinfo='skip'
     ))
-
-    # Arrowhead triangle at angle 0° (top), pointing clockwise
+    # Arrowhead at angle 0° (top)
     tip_r = 1.03
     base_r = 0.97
     angle_center = 0
@@ -253,10 +252,18 @@ def radar_chart(survey_row, school_name):
         hoverinfo='skip'
     ))
 
-    # ---- 3. Layout: set angular axis ticks to variable names ----
-    # Compute the angles for each variable (equally spaced around 360°)
+    # ---- 3. Layout: force angular axis ticks ----
     num_vars = len(variables)
-    angles = np.linspace(0, 360, num_vars, endpoint=False)  # [0, 51.4, 102.8, ...]
+    # Start at 90° (top) so first variable is at the top, then go clockwise.
+    # Plotly's polar uses degrees measured from the top (12 o'clock) going clockwise?
+    # Actually, the default angular axis starts at the right (3 o'clock) and goes counter‑clockwise.
+    # Since we set direction='clockwise', we need to set the starting angle to 90° to have first variable at top.
+    # We can set `rotation=90` in angularaxis to rotate the whole axis.
+    # Alternatively, compute angles with a shift.
+    # Let's use the simpler method: set rotation so that the first variable is at the top.
+    angles = np.linspace(0, 360, num_vars, endpoint=False)  # 0, 51.4, ...
+    # We want the first variable (index 0) to be at 90° (top). So we shift all angles by 90°.
+    angles = (angles + 90) % 360
 
     fig.update_layout(
         polar=dict(
@@ -268,15 +275,19 @@ def radar_chart(survey_row, school_name):
                 color=USTP_DARK_BLUE
             ),
             angularaxis=dict(
-                direction="clockwise",   # clockwise milestone order
+                direction="clockwise",
+                rotation=90,          # start at top (12 o'clock)
+                tickmode='array',
                 tickvals=angles.tolist(),
                 ticktext=variables,
-                tickfont=dict(size=10, color=USTP_DARK_BLUE)
+                tickfont=dict(size=9, color=USTP_DARK_BLUE)
             )
         ),
         title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
         showlegend=False,
-        font=dict(color=USTP_DARK_BLUE)
+        font=dict(color=USTP_DARK_BLUE),
+        height=550,   # give more space
+        margin=dict(l=60, r=60, t=80, b=60)
     )
     return fig
 def research_outputs_dashboard(metadata_df, school_id, school_name):
