@@ -196,103 +196,77 @@ def get_latest_survey(survey_df, school_id):
         return None
     return school_data.sort_values('month_num').iloc[-1]
 
-# ---------- New modular radar chart ----------
-# Constants
-RADAR_VARIABLES = [
-    ('R', 'M0'), ('A', 'M1'), ('C', 'M2'), ('S', 'M3'),
-    ('I', 'M4'), ('P', 'M5'), ('M', 'M6')
-]
-
-def _format_labels(variables):
-    """Format variable tuples into display labels."""
-    return [f"{key} ({milestone})" for key, milestone in variables]
-
-def _extract_values(survey_row, variables):
-    """Extract ordered values from survey row using variable keys."""
-    return [survey_row[key] for key, _ in variables]
-
-def _make_radar_trace(values, labels, name):
-    """Create the main filled radar trace."""
-    return go.Scatterpolar(
-        r=values,
-        theta=labels,
-        fill='toself',
-        name=name,
-        line_color=USTP_GOLD,
-        fillcolor=f"rgba(245, 166, 35, 0.3)"
-    )
-
-def _make_circle_trace(radius=1.0, n_points=100):
-    """Create a dashed circular reference ring."""
-    angles = np.linspace(0, 360, n_points)
-    return go.Scatterpolar(
-        r=[radius] * n_points,
-        theta=angles,
-        mode='lines',
-        line=dict(color=USTP_DARK_BLUE, width=1.5, dash='dash'),
-        showlegend=False,
-        hoverinfo='skip'
-    )
-
-def _make_arrowhead_trace(tip_r=1.03, base_r=0.97, center_angle=0, spread=5):
-    """Create a triangular arrowhead on the circular ring."""
-    return go.Scatterpolar(
-        r=[base_r, base_r, tip_r, base_r],
-        theta=[center_angle - spread, center_angle + spread, center_angle, center_angle - spread],
-        mode='lines',
-        line=dict(color=USTP_DARK_BLUE, width=1),
-        fill='toself',
-        fillcolor=USTP_DARK_BLUE,
-        showlegend=False,
-        hoverinfo='skip'
-    )
-
-def _compute_angular_tickvals(n, start_deg=90):
-    """Compute evenly spaced angular tick positions starting from a given angle."""
-    angles = np.linspace(0, 360, n, endpoint=False)
-    return ((angles + start_deg) % 360).tolist()
-
+# ---------- Revised simple radar chart with large annotation ----------
 def radar_chart(survey_row, school_name):
     """
     Generate a radar chart showing the research culture profile for a school.
+    Uses a simple, reliable layout with a prominent clockwise direction annotation.
     """
-    labels = _format_labels(RADAR_VARIABLES)
-    values = _extract_values(survey_row, RADAR_VARIABLES)
-    tick_angles = _compute_angular_tickvals(len(RADAR_VARIABLES))
+    # Define variables with milestone labels
+    variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
+    # Map variable names to survey row values
+    value_map = {
+        'R (M0)': survey_row['R'],
+        'A (M1)': survey_row['A'],
+        'C (M2)': survey_row['C'],
+        'S (M3)': survey_row['S'],
+        'I (M4)': survey_row['I'],
+        'P (M5)': survey_row['P'],
+        'M (M6)': survey_row['M']
+    }
+    values = [value_map[v] for v in variables]
 
-    fig = go.Figure(data=[
-        _make_radar_trace(values, labels, school_name),
-        _make_circle_trace(),
-        _make_arrowhead_trace(),
-    ])
+    # Create the radar trace
+    fig = go.Figure()
+    fig.add_trace(go.Scatterpolar(
+        r=values,
+        theta=variables,
+        fill='toself',
+        name=school_name,
+        line_color=USTP_GOLD,
+        fillcolor=f"rgba(245, 166, 35, 0.3)"
+    ))
 
+    # Layout with clockwise angular axis and a large annotation
     fig.update_layout(
         polar=dict(
             radialaxis=dict(
                 visible=True,
-                range=[0, 1.05],
-                tickvals=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
-                ticktext=["0", "0.2", "0.4", "0.6", "0.8", "1.0"],
-                color=USTP_DARK_BLUE,
+                range=[0, 1.0],
+                tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
+                ticktext=['0', '0.2', '0.4', '0.6', '0.8', '1.0'],
+                color=USTP_DARK_BLUE
             ),
             angularaxis=dict(
-                direction="clockwise",
-                rotation=90,
-                tickmode='array',
-                tickvals=tick_angles,
-                ticktext=labels,
-                tickfont=dict(size=9, color=USTP_DARK_BLUE),
-            ),
+                direction="clockwise",   # ensures M0 → M1 → ... → M6 → back to M0
+                tickfont=dict(size=11, color=USTP_DARK_BLUE)
+            )
         ),
         title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
         showlegend=False,
         font=dict(color=USTP_DARK_BLUE),
-        height=550,
-        margin=dict(l=60, r=60, t=80, b=60),
+        annotations=[
+            dict(
+                text="↻ <b>Milestone cycle direction (clockwise)</b>",
+                xref="paper",
+                yref="paper",
+                x=0.85,
+                y=0.95,
+                showarrow=False,
+                font=dict(size=16, color=USTP_DARK_BLUE),
+                bgcolor="rgba(255,255,255,0.8)",
+                bordercolor=USTP_GOLD,
+                borderwidth=1,
+                borderpad=4,
+                opacity=0.9
+            )
+        ],
+        height=500,
+        margin=dict(l=60, r=60, t=80, b=60)
     )
     return fig
 
-# ---------- End of new radar chart ----------
+# ---------- End of revised radar chart ----------
 
 def research_outputs_dashboard(metadata_df, school_id, school_name):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
@@ -546,10 +520,10 @@ if survey_file is not None and metadata_file is not None:
                     fig1.update_yaxes(title_text="RCSI", row=2, col=2)
                     st.plotly_chart(fig1, use_container_width=True)
 
-                    # Radar chart (new modular version)
+                    # Radar chart (new simple version)
                     latest = get_latest_survey(survey_df, selected_school_id)
                     if latest is not None:
-                        # Convert Series to dict for the new function
+                        # Convert Series to dict for the function
                         latest_dict = latest.to_dict()
                         st.plotly_chart(radar_chart(latest_dict, selected_school_name), use_container_width=True)
                     else:
@@ -560,7 +534,7 @@ if survey_file is not None and metadata_file is not None:
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id)
 
-                    # RCSI interpretation table (plain Markdown, no HTML)
+                    # RCSI interpretation table (plain Markdown)
                     st.markdown("### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
                     st.markdown("""
                     | RCSI Range | Level | Description |
