@@ -209,9 +209,42 @@ def radar_chart(survey_row, school_name):
         'M (M6)': survey_row['M']
     }
     values = [value_map[v] for v in variables]
-    
-    # Main radar trace
+
+    # Create figure
     fig = go.Figure()
+
+    # ---- 1. Circular arrow (circle + arrowhead) ----
+    # Draw a dashed circle at r = 1.0 (the grid boundary)
+    angles_deg = np.linspace(0, 360, 100)
+    fig.add_trace(go.Scatterpolar(
+        r=[1.0] * len(angles_deg),
+        theta=angles_deg,
+        mode='lines',
+        line=dict(color=USTP_DARK_BLUE, width=1.5, dash='dash'),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Arrowhead: a small triangle at angle 0° (top) pointing clockwise
+    # Points: base at r=0.97 (left and right of 0°), tip at r=1.03 (further out)
+    # The triangle will point outward and slightly clockwise.
+    tip_r = 1.03
+    base_r = 0.97
+    angle_center = 0
+    angle_left = -5   # degrees counter‑clockwise
+    angle_right = 5   # degrees clockwise
+    fig.add_trace(go.Scatterpolar(
+        r=[base_r, base_r, tip_r, base_r],
+        theta=[angle_left, angle_right, angle_center, angle_left],
+        mode='lines',
+        line=dict(color=USTP_DARK_BLUE, width=1),
+        fill='toself',
+        fillcolor=USTP_DARK_BLUE,
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # ---- 2. Main radar trace (fill) ----
     fig.add_trace(go.Scatterpolar(
         r=values,
         theta=variables,
@@ -220,54 +253,21 @@ def radar_chart(survey_row, school_name):
         line_color=USTP_GOLD,
         fillcolor=f"rgba(245, 166, 35, 0.3)"
     ))
-    
-    # ---- Circular arrow around the radar ----
-    import math
-    # Circle radius (just outside max radial axis = 1.0)
-    outer_r = 1.05
-    # Generate 100 points around the circle (clockwise direction)
-    angles_deg = np.linspace(0, 360, 100)  # 0 to 360 degrees
-    # For a clockwise circle, Plotly's polar coordinates already go clockwise if direction='clockwise'
-    # We'll just plot the circle
-    fig.add_trace(go.Scatterpolar(
-        r=[outer_r] * len(angles_deg),
-        theta=angles_deg,
-        mode='lines',
-        line=dict(color=USTP_DARK_BLUE, width=1.5, dash='dash'),
-        showlegend=False,
-        hoverinfo='skip'
-    ))
-    
-    # ---- Arrowhead at the end (angle = 0, at the top) ----
-    # We want a small triangle pointing in the clockwise direction.
-    # At angle 0 (top), clockwise direction is to the right.
-    # We'll place three points: base at (r=outer_r-0.05, angle=0) and (r=outer_r-0.05, angle=5°), and tip at (r=outer_r+0.05, angle=0)
-    # This creates a triangle pointing outward and slightly clockwise.
-    # But better: use a triangle that points tangentially (clockwise).
-    # Simpler: use a marker with a custom symbol 'triangle-up' and rotate it using 'angle' parameter? Not straightforward.
-    # We'll use a small triangle trace with three points.
-    tip_r = outer_r + 0.05
-    base_r = outer_r - 0.05
-    # Angle offsets: one at 0, one at +4°, one at -4° (to make a triangle pointing clockwise)
-    angle_center = 0
-    angle_left = -4   # slightly counter‑clockwise
-    angle_right = 4   # slightly clockwise
-    fig.add_trace(go.Scatterpolar(
-        r=[base_r, base_r, tip_r, base_r],
-        theta=[angle_left, angle_right, angle_center, angle_left],
-        mode='lines',
-        line=dict(color=USTP_DARK_BLUE, width=1.5),
-        fill='toself',
-        fillcolor=USTP_DARK_BLUE,
-        showlegend=False,
-        hoverinfo='skip'
-    ))
-    
-    # Set polar layout with clockwise direction
+
+    # ---- 3. Layout ----
     fig.update_layout(
         polar=dict(
-            radialaxis=dict(visible=True, range=[0, 1], color=USTP_DARK_BLUE),
-            angularaxis=dict(direction="clockwise")
+            radialaxis=dict(
+                visible=True,
+                range=[0, 1.05],   # slightly above 1 to show the arrow tip
+                tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
+                ticktext=['0', '0.2', '0.4', '0.6', '0.8', '1.0'],
+                color=USTP_DARK_BLUE
+            ),
+            angularaxis=dict(
+                direction="clockwise",   # ensures milestones go clockwise
+                tickfont=dict(size=10, color=USTP_DARK_BLUE)
+            )
         ),
         title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
         showlegend=False,
