@@ -196,16 +196,13 @@ def get_latest_survey(survey_df, school_id):
         return None
     return school_data.sort_values('month_num').iloc[-1]
 
-# ---------- Revised simple radar chart with annotation moved top-right ----------
+# ---------- Radar chart with annotation positioned at far right ----------
 def radar_chart(survey_row, school_name):
     """
-    Generate a radar chart showing the research culture profile for a school.
-    Uses a simple, reliable layout with a prominent clockwise direction annotation
-    positioned at the top-right to avoid overlap.
+    Generate a radar chart with a prominent clockwise direction annotation
+    placed at the far right edge to avoid overlap.
     """
-    # Define variables with milestone labels
     variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
-    # Map variable names to survey row values
     value_map = {
         'R (M0)': survey_row['R'],
         'A (M1)': survey_row['A'],
@@ -217,7 +214,6 @@ def radar_chart(survey_row, school_name):
     }
     values = [value_map[v] for v in variables]
 
-    # Create the radar trace
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(
         r=values,
@@ -228,7 +224,6 @@ def radar_chart(survey_row, school_name):
         fillcolor=f"rgba(245, 166, 35, 0.3)"
     ))
 
-    # Layout with clockwise angular axis and a large annotation
     fig.update_layout(
         polar=dict(
             radialaxis=dict(
@@ -239,7 +234,7 @@ def radar_chart(survey_row, school_name):
                 color=USTP_DARK_BLUE
             ),
             angularaxis=dict(
-                direction="clockwise",   # ensures M0 → M1 → ... → M6 → back to M0
+                direction="clockwise",
                 tickfont=dict(size=11, color=USTP_DARK_BLUE)
             )
         ),
@@ -251,10 +246,12 @@ def radar_chart(survey_row, school_name):
                 text="↻ <b>Milestone cycle direction (clockwise)</b>",
                 xref="paper",
                 yref="paper",
-                x=0.95,          # moved further right
-                y=0.98,          # moved further up
+                x=1.0,                # far right edge
+                y=0.95,               # slightly lower to avoid top margin
+                xanchor='right',      # anchor text to the right
+                yanchor='top',
                 showarrow=False,
-                font=dict(size=16, color=USTP_DARK_BLUE),
+                font=dict(size=14, color=USTP_DARK_BLUE),
                 bgcolor="rgba(255,255,255,0.8)",
                 bordercolor=USTP_GOLD,
                 borderwidth=1,
@@ -263,11 +260,11 @@ def radar_chart(survey_row, school_name):
             )
         ],
         height=500,
-        margin=dict(l=60, r=60, t=100, b=60)   # increased top margin to avoid clipping
+        margin=dict(l=60, r=80, t=80, b=60)   # extra right margin for annotation
     )
     return fig
 
-# ---------- End of revised radar chart ----------
+# ---------- End of radar chart ----------
 
 def research_outputs_dashboard(metadata_df, school_id, school_name):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
@@ -521,10 +518,9 @@ if survey_file is not None and metadata_file is not None:
                     fig1.update_yaxes(title_text="RCSI", row=2, col=2)
                     st.plotly_chart(fig1, use_container_width=True)
 
-                    # Radar chart (new simple version)
+                    # Radar chart
                     latest = get_latest_survey(survey_df, selected_school_id)
                     if latest is not None:
-                        # Convert Series to dict for the function
                         latest_dict = latest.to_dict()
                         st.plotly_chart(radar_chart(latest_dict, selected_school_name), use_container_width=True)
                     else:
@@ -535,7 +531,7 @@ if survey_file is not None and metadata_file is not None:
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id)
 
-                    # RCSI interpretation table (plain Markdown)
+                    # RCSI interpretation table
                     st.markdown("### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
                     st.markdown("""
                     | RCSI Range | Level | Description |
@@ -547,7 +543,7 @@ if survey_file is not None and metadata_file is not None:
                     | 0.8 – 1.0 | Very High | Excellent vitality; research culture fully embedded. |
                     """)
 
-                    # Per‑school synopsis (coherent)
+                    # Per‑school synopsis
                     rcsi_val = agent.running_total_outcome
                     rcsi_level = "Exceptional"
                     for low,high,lev in [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]:
@@ -590,7 +586,7 @@ if survey_file is not None and metadata_file is not None:
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # ---- Division synopsis (with average milestone interpretation) ----
+                    # Division synopsis
                     total_schools = len(st.session_state.sim.agents)
                     early_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
                     advanced_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
