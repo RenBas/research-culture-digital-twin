@@ -197,6 +197,7 @@ def get_latest_survey(survey_df, school_id):
     return school_data.sort_values('month_num').iloc[-1]
 
 def radar_chart(survey_row, school_name):
+    import numpy as np
     # Variables with milestone numbers
     variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
     value_map = {
@@ -213,8 +214,18 @@ def radar_chart(survey_row, school_name):
     # Create figure
     fig = go.Figure()
 
-    # ---- 1. Circular arrow (circle + arrowhead) ----
-    # Draw a dashed circle at r = 1.0 (the grid boundary)
+    # ---- 1. Main radar trace (fill) ----
+    fig.add_trace(go.Scatterpolar(
+        r=values,
+        theta=variables,
+        fill='toself',
+        name=school_name,
+        line_color=USTP_GOLD,
+        fillcolor=f"rgba(245, 166, 35, 0.3)"
+    ))
+
+    # ---- 2. Circular arrow (dashed circle + arrowhead) ----
+    # Circle at r=1.0
     angles_deg = np.linspace(0, 360, 100)
     fig.add_trace(go.Scatterpolar(
         r=[1.0] * len(angles_deg),
@@ -225,14 +236,12 @@ def radar_chart(survey_row, school_name):
         hoverinfo='skip'
     ))
 
-    # Arrowhead: a small triangle at angle 0° (top) pointing clockwise
-    # Points: base at r=0.97 (left and right of 0°), tip at r=1.03 (further out)
-    # The triangle will point outward and slightly clockwise.
+    # Arrowhead triangle at angle 0° (top), pointing clockwise
     tip_r = 1.03
     base_r = 0.97
     angle_center = 0
-    angle_left = -5   # degrees counter‑clockwise
-    angle_right = 5   # degrees clockwise
+    angle_left = -5
+    angle_right = 5
     fig.add_trace(go.Scatterpolar(
         r=[base_r, base_r, tip_r, base_r],
         theta=[angle_left, angle_right, angle_center, angle_left],
@@ -244,28 +253,24 @@ def radar_chart(survey_row, school_name):
         hoverinfo='skip'
     ))
 
-    # ---- 2. Main radar trace (fill) ----
-    fig.add_trace(go.Scatterpolar(
-        r=values,
-        theta=variables,
-        fill='toself',
-        name=school_name,
-        line_color=USTP_GOLD,
-        fillcolor=f"rgba(245, 166, 35, 0.3)"
-    ))
+    # ---- 3. Layout: set angular axis ticks to variable names ----
+    # Compute the angles for each variable (equally spaced around 360°)
+    num_vars = len(variables)
+    angles = np.linspace(0, 360, num_vars, endpoint=False)  # [0, 51.4, 102.8, ...]
 
-    # ---- 3. Layout ----
     fig.update_layout(
         polar=dict(
             radialaxis=dict(
                 visible=True,
-                range=[0, 1.05],   # slightly above 1 to show the arrow tip
+                range=[0, 1.05],
                 tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
                 ticktext=['0', '0.2', '0.4', '0.6', '0.8', '1.0'],
                 color=USTP_DARK_BLUE
             ),
             angularaxis=dict(
-                direction="clockwise",   # ensures milestones go clockwise
+                direction="clockwise",   # clockwise milestone order
+                tickvals=angles.tolist(),
+                ticktext=variables,
                 tickfont=dict(size=10, color=USTP_DARK_BLUE)
             )
         ),
