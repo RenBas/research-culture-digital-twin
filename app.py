@@ -196,27 +196,22 @@ def get_latest_survey(survey_df, school_id):
         return None
     return school_data.sort_values('month_num').iloc[-1]
 
-import numpy as np
-import plotly.graph_objects as go
-
+# ---------- New modular radar chart ----------
 # Constants
-USTP_GOLD = "#F5A623"
-USTP_DARK_BLUE = "#003366"
-
 RADAR_VARIABLES = [
     ('R', 'M0'), ('A', 'M1'), ('C', 'M2'), ('S', 'M3'),
     ('I', 'M4'), ('P', 'M5'), ('M', 'M6')
 ]
 
-def _format_labels(variables: list[tuple]) -> list[str]:
+def _format_labels(variables):
     """Format variable tuples into display labels."""
     return [f"{key} ({milestone})" for key, milestone in variables]
 
-def _extract_values(survey_row: dict, variables: list[tuple]) -> list[float]:
+def _extract_values(survey_row, variables):
     """Extract ordered values from survey row using variable keys."""
     return [survey_row[key] for key, _ in variables]
 
-def _make_radar_trace(values: list[float], labels: list[str], name: str) -> go.Scatterpolar:
+def _make_radar_trace(values, labels, name):
     """Create the main filled radar trace."""
     return go.Scatterpolar(
         r=values,
@@ -224,10 +219,10 @@ def _make_radar_trace(values: list[float], labels: list[str], name: str) -> go.S
         fill='toself',
         name=name,
         line_color=USTP_GOLD,
-        fillcolor="rgba(245, 166, 35, 0.3)"
+        fillcolor=f"rgba(245, 166, 35, 0.3)"
     )
 
-def _make_circle_trace(radius: float = 1.0, n_points: int = 100) -> go.Scatterpolar:
+def _make_circle_trace(radius=1.0, n_points=100):
     """Create a dashed circular reference ring."""
     angles = np.linspace(0, 360, n_points)
     return go.Scatterpolar(
@@ -239,12 +234,7 @@ def _make_circle_trace(radius: float = 1.0, n_points: int = 100) -> go.Scatterpo
         hoverinfo='skip'
     )
 
-def _make_arrowhead_trace(
-    tip_r: float = 1.03,
-    base_r: float = 0.97,
-    center_angle: float = 0,
-    spread: float = 5
-) -> go.Scatterpolar:
+def _make_arrowhead_trace(tip_r=1.03, base_r=0.97, center_angle=0, spread=5):
     """Create a triangular arrowhead on the circular ring."""
     return go.Scatterpolar(
         r=[base_r, base_r, tip_r, base_r],
@@ -257,27 +247,20 @@ def _make_arrowhead_trace(
         hoverinfo='skip'
     )
 
-def _compute_angular_tickvals(n: int, start_deg: float = 90) -> list[float]:
+def _compute_angular_tickvals(n, start_deg=90):
     """Compute evenly spaced angular tick positions starting from a given angle."""
     angles = np.linspace(0, 360, n, endpoint=False)
     return ((angles + start_deg) % 360).tolist()
 
-def radar_chart(survey_row: dict, school_name: str) -> go.Figure:
+def radar_chart(survey_row, school_name):
     """
     Generate a radar chart showing the research culture profile for a school.
-
-    Args:
-        survey_row: Dict with keys R, A, C, S, I, P, M and float values in [0, 1].
-        school_name: Display name shown in the chart title.
-
-    Returns:
-        A Plotly Figure object.
     """
     labels = _format_labels(RADAR_VARIABLES)
     values = _extract_values(survey_row, RADAR_VARIABLES)
     tick_angles = _compute_angular_tickvals(len(RADAR_VARIABLES))
 
-    fig = go.Figure(traces=[
+    fig = go.Figure(data=[
         _make_radar_trace(values, labels, school_name),
         _make_circle_trace(),
         _make_arrowhead_trace(),
@@ -301,16 +284,16 @@ def radar_chart(survey_row: dict, school_name: str) -> go.Figure:
                 tickfont=dict(size=9, color=USTP_DARK_BLUE),
             ),
         ),
-        title=(
-            f"Current Research Culture Profile (latest quarter)<br>{school_name}"
-        ),
+        title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
         showlegend=False,
         font=dict(color=USTP_DARK_BLUE),
         height=550,
         margin=dict(l=60, r=60, t=80, b=60),
     )
-
     return fig
+
+# ---------- End of new radar chart ----------
+
 def research_outputs_dashboard(metadata_df, school_id, school_name):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     if school_meta.empty:
@@ -563,10 +546,12 @@ if survey_file is not None and metadata_file is not None:
                     fig1.update_yaxes(title_text="RCSI", row=2, col=2)
                     st.plotly_chart(fig1, use_container_width=True)
 
-                    # Radar chart
+                    # Radar chart (new modular version)
                     latest = get_latest_survey(survey_df, selected_school_id)
                     if latest is not None:
-                        st.plotly_chart(radar_chart(latest, selected_school_name), use_container_width=True)
+                        # Convert Series to dict for the new function
+                        latest_dict = latest.to_dict()
+                        st.plotly_chart(radar_chart(latest_dict, selected_school_name), use_container_width=True)
                     else:
                         st.info("No survey data for current quarter.")
 
