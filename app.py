@@ -196,99 +196,120 @@ def get_latest_survey(survey_df, school_id):
         return None
     return school_data.sort_values('month_num').iloc[-1]
 
-def radar_chart(survey_row, school_name):
-    import numpy as np
-    # Variables with milestone numbers
-    variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
-    value_map = {
-        'R (M0)': survey_row['R'],
-        'A (M1)': survey_row['A'],
-        'C (M2)': survey_row['C'],
-        'S (M3)': survey_row['S'],
-        'I (M4)': survey_row['I'],
-        'P (M5)': survey_row['P'],
-        'M (M6)': survey_row['M']
-    }
-    values = [value_map[v] for v in variables]
+import numpy as np
+import plotly.graph_objects as go
 
-    # Create figure
-    fig = go.Figure()
+# Constants
+USTP_GOLD = "#F5A623"
+USTP_DARK_BLUE = "#003366"
 
-    # ---- 1. Main radar trace ----
-    fig.add_trace(go.Scatterpolar(
+RADAR_VARIABLES = [
+    ('R', 'M0'), ('A', 'M1'), ('C', 'M2'), ('S', 'M3'),
+    ('I', 'M4'), ('P', 'M5'), ('M', 'M6')
+]
+
+def _format_labels(variables: list[tuple]) -> list[str]:
+    """Format variable tuples into display labels."""
+    return [f"{key} ({milestone})" for key, milestone in variables]
+
+def _extract_values(survey_row: dict, variables: list[tuple]) -> list[float]:
+    """Extract ordered values from survey row using variable keys."""
+    return [survey_row[key] for key, _ in variables]
+
+def _make_radar_trace(values: list[float], labels: list[str], name: str) -> go.Scatterpolar:
+    """Create the main filled radar trace."""
+    return go.Scatterpolar(
         r=values,
-        theta=variables,
+        theta=labels,
         fill='toself',
-        name=school_name,
+        name=name,
         line_color=USTP_GOLD,
-        fillcolor=f"rgba(245, 166, 35, 0.3)"
-    ))
+        fillcolor="rgba(245, 166, 35, 0.3)"
+    )
 
-    # ---- 2. Circular arrow ----
-    angles_deg = np.linspace(0, 360, 100)
-    # Circle at r=1.0
-    fig.add_trace(go.Scatterpolar(
-        r=[1.0] * len(angles_deg),
-        theta=angles_deg,
+def _make_circle_trace(radius: float = 1.0, n_points: int = 100) -> go.Scatterpolar:
+    """Create a dashed circular reference ring."""
+    angles = np.linspace(0, 360, n_points)
+    return go.Scatterpolar(
+        r=[radius] * n_points,
+        theta=angles,
         mode='lines',
         line=dict(color=USTP_DARK_BLUE, width=1.5, dash='dash'),
         showlegend=False,
         hoverinfo='skip'
-    ))
-    # Arrowhead at angle 0° (top)
-    tip_r = 1.03
-    base_r = 0.97
-    angle_center = 0
-    angle_left = -5
-    angle_right = 5
-    fig.add_trace(go.Scatterpolar(
+    )
+
+def _make_arrowhead_trace(
+    tip_r: float = 1.03,
+    base_r: float = 0.97,
+    center_angle: float = 0,
+    spread: float = 5
+) -> go.Scatterpolar:
+    """Create a triangular arrowhead on the circular ring."""
+    return go.Scatterpolar(
         r=[base_r, base_r, tip_r, base_r],
-        theta=[angle_left, angle_right, angle_center, angle_left],
+        theta=[center_angle - spread, center_angle + spread, center_angle, center_angle - spread],
         mode='lines',
         line=dict(color=USTP_DARK_BLUE, width=1),
         fill='toself',
         fillcolor=USTP_DARK_BLUE,
         showlegend=False,
         hoverinfo='skip'
-    ))
+    )
 
-    # ---- 3. Layout: force angular axis ticks ----
-    num_vars = len(variables)
-    # Start at 90° (top) so first variable is at the top, then go clockwise.
-    # Plotly's polar uses degrees measured from the top (12 o'clock) going clockwise?
-    # Actually, the default angular axis starts at the right (3 o'clock) and goes counter‑clockwise.
-    # Since we set direction='clockwise', we need to set the starting angle to 90° to have first variable at top.
-    # We can set `rotation=90` in angularaxis to rotate the whole axis.
-    # Alternatively, compute angles with a shift.
-    # Let's use the simpler method: set rotation so that the first variable is at the top.
-    angles = np.linspace(0, 360, num_vars, endpoint=False)  # 0, 51.4, ...
-    # We want the first variable (index 0) to be at 90° (top). So we shift all angles by 90°.
-    angles = (angles + 90) % 360
+def _compute_angular_tickvals(n: int, start_deg: float = 90) -> list[float]:
+    """Compute evenly spaced angular tick positions starting from a given angle."""
+    angles = np.linspace(0, 360, n, endpoint=False)
+    return ((angles + start_deg) % 360).tolist()
+
+def radar_chart(survey_row: dict, school_name: str) -> go.Figure:
+    """
+    Generate a radar chart showing the research culture profile for a school.
+
+    Args:
+        survey_row: Dict with keys R, A, C, S, I, P, M and float values in [0, 1].
+        school_name: Display name shown in the chart title.
+
+    Returns:
+        A Plotly Figure object.
+    """
+    labels = _format_labels(RADAR_VARIABLES)
+    values = _extract_values(survey_row, RADAR_VARIABLES)
+    tick_angles = _compute_angular_tickvals(len(RADAR_VARIABLES))
+
+    fig = go.Figure(traces=[
+        _make_radar_trace(values, labels, school_name),
+        _make_circle_trace(),
+        _make_arrowhead_trace(),
+    ])
 
     fig.update_layout(
         polar=dict(
             radialaxis=dict(
                 visible=True,
                 range=[0, 1.05],
-                tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
-                ticktext=['0', '0.2', '0.4', '0.6', '0.8', '1.0'],
-                color=USTP_DARK_BLUE
+                tickvals=[0.0, 0.2, 0.4, 0.6, 0.8, 1.0],
+                ticktext=["0", "0.2", "0.4", "0.6", "0.8", "1.0"],
+                color=USTP_DARK_BLUE,
             ),
             angularaxis=dict(
                 direction="clockwise",
-                rotation=90,          # start at top (12 o'clock)
+                rotation=90,
                 tickmode='array',
-                tickvals=angles.tolist(),
-                ticktext=variables,
-                tickfont=dict(size=9, color=USTP_DARK_BLUE)
-            )
+                tickvals=tick_angles,
+                ticktext=labels,
+                tickfont=dict(size=9, color=USTP_DARK_BLUE),
+            ),
         ),
-        title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
+        title=(
+            f"Current Research Culture Profile (latest quarter)<br>{school_name}"
+        ),
         showlegend=False,
         font=dict(color=USTP_DARK_BLUE),
-        height=550,   # give more space
-        margin=dict(l=60, r=60, t=80, b=60)
+        height=550,
+        margin=dict(l=60, r=60, t=80, b=60),
     )
+
     return fig
 def research_outputs_dashboard(metadata_df, school_id, school_name):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
