@@ -196,11 +196,12 @@ def get_latest_survey(survey_df, school_id):
         return None
     return school_data.sort_values('month_num').iloc[-1]
 
-# ---------- Revised simple radar chart with large annotation ----------
+# ---------- Revised simple radar chart with annotation moved top-right ----------
 def radar_chart(survey_row, school_name):
     """
     Generate a radar chart showing the research culture profile for a school.
-    Uses a simple, reliable layout with a prominent clockwise direction annotation.
+    Uses a simple, reliable layout with a prominent clockwise direction annotation
+    positioned at the top-right to avoid overlap.
     """
     # Define variables with milestone labels
     variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
@@ -250,8 +251,8 @@ def radar_chart(survey_row, school_name):
                 text="↻ <b>Milestone cycle direction (clockwise)</b>",
                 xref="paper",
                 yref="paper",
-                x=0.85,
-                y=0.95,
+                x=0.95,          # moved further right
+                y=0.98,          # moved further up
                 showarrow=False,
                 font=dict(size=16, color=USTP_DARK_BLUE),
                 bgcolor="rgba(255,255,255,0.8)",
@@ -262,7 +263,7 @@ def radar_chart(survey_row, school_name):
             )
         ],
         height=500,
-        margin=dict(l=60, r=60, t=80, b=60)
+        margin=dict(l=60, r=60, t=100, b=60)   # increased top margin to avoid clipping
     )
     return fig
 
