@@ -185,9 +185,8 @@ def process_metadata(metadata_df):
             metadata_df['utilization_date'] = ''
         if 'publication_link' not in metadata_df.columns:
             metadata_df['publication_link'] = ''
-        # New column: years_of_service – optional
         if 'years_of_service' not in metadata_df.columns:
-            metadata_df['years_of_service'] = None  # will show as missing
+            metadata_df['years_of_service'] = None
         metadata_df['upload_date'] = pd.to_datetime(metadata_df['upload_date'])
         return metadata_df, None
     except Exception as e:
@@ -263,14 +262,13 @@ def radar_chart(survey_row, school_name):
     )
     return fig
 
-# ---------- Research Outputs Dashboard with new scatter plot ----------
+# ---------- Research Outputs Dashboard with scatter plot ----------
 def research_outputs_dashboard(metadata_df, school_id, school_name):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     if school_meta.empty:
         st.info(f"No research outputs for {school_name}.")
         return
 
-    # Theme Distribution
     theme_counts = school_meta['theme'].value_counts().reset_index()
     theme_counts.columns = ['Theme', 'Count']
     fig_theme = px.bar(theme_counts, x='Theme', y='Count', title=f"Theme Distribution – {school_name}", color='Theme', color_discrete_sequence=[USTP_GOLD, DEPED_RED, USTP_DARK_BLUE])
@@ -279,7 +277,6 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
         top_theme = theme_counts.iloc[0]['Theme']
         st.caption(f"📝 Research outputs are most concentrated in '{top_theme}'. This suggests the school’s research focus area.")
 
-    # Publication Status
     status_counts = school_meta['status'].value_counts().reset_index()
     status_counts.columns = ['Status', 'Count']
     fig_status = px.bar(status_counts, x='Status', y='Count', title=f"Publication Status – {school_name}", color='Status', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_MAROON])
@@ -290,7 +287,6 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
         pub_rate = (published/total*100) if total>0 else 0
         st.caption(f"📝 {pub_rate:.1f}% of research outputs are published. A higher publication rate often correlates with greater institutional recognition.")
 
-    # Utilisation Rate
     utilised = school_meta['utilized_by_school'].sum() if 'utilized_by_school' in school_meta.columns else 0
     total = len(school_meta)
     util_rate = (utilised / total * 100) if total > 0 else 0
@@ -298,7 +294,6 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
               help="Percentage of research outputs from this school that have been adopted into practice (e.g., new teaching strategies, policy changes).")
     st.caption(f"📝 {'High utilisation indicates strong translation of research into practice.' if util_rate > 70 else 'Moderate or low utilisation suggests a gap between research production and practical adoption.'}")
 
-    # Teacher Productivity (Top 10)
     teacher_counts = school_meta['teacher_name'].value_counts().reset_index().head(10)
     teacher_counts.columns = ['Teacher', 'Number of Outputs']
     fig_teacher = px.bar(teacher_counts, x='Number of Outputs', y='Teacher', orientation='h', title=f"Teacher Productivity (Top 10) – {school_name}", color='Number of Outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
@@ -306,7 +301,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
     if not teacher_counts.empty:
         st.caption(f"📝 The most productive teacher has {teacher_counts.iloc[0]['Number of Outputs']} research outputs. Encouraging collaborative research could further strengthen culture.")
 
-    # ---- YEARS OF SERVICE vs RESEARCH OUTPUTS (Scatter Plot with Trend Line) ----
+    # ---- Years of Service vs Research Outputs (Scatter Plot with Trend Line) ----
     if 'years_of_service' in school_meta.columns and not school_meta['years_of_service'].isna().all():
         teacher_summary = school_meta.groupby('teacher_name').agg(
             output_count=('document_type', 'count'),
@@ -316,7 +311,6 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
         if len(teacher_summary) > 1:
             x = teacher_summary['years_of_service']
             y = teacher_summary['output_count']
-            # Trend line
             z = np.polyfit(x, y, 1)
             p = np.poly1d(z)
             trend_x = np.linspace(x.min(), x.max(), 100)
@@ -343,7 +337,6 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
                 height=400
             )
             st.plotly_chart(fig_service, use_container_width=True)
-            # Interpretation
             avg_output = teacher_summary['output_count'].mean()
             avg_service = teacher_summary['years_of_service'].mean()
             slope = z[0]
@@ -534,7 +527,7 @@ if survey_file is not None and metadata_file is not None:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
                     agent.real_id = school_ids[idx]
-                for agent in st.session_state.sim.agents):
+                for agent in st.session_state.sim.agents:  # <-- FIXED: removed extra ')'
                     school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
                     agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
                     agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
