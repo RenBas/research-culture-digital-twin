@@ -185,6 +185,9 @@ def process_metadata(metadata_df):
             metadata_df['utilization_date'] = ''
         if 'publication_link' not in metadata_df.columns:
             metadata_df['publication_link'] = ''
+        # New column: years_of_service – optional
+        if 'years_of_service' not in metadata_df.columns:
+            metadata_df['years_of_service'] = None  # will show as missing
         metadata_df['upload_date'] = pd.to_datetime(metadata_df['upload_date'])
         return metadata_df, None
     except Exception as e:
@@ -198,10 +201,6 @@ def get_latest_survey(survey_df, school_id):
 
 # ---------- Radar chart with annotation positioned at far right ----------
 def radar_chart(survey_row, school_name):
-    """
-    Generate a radar chart with a prominent clockwise direction annotation
-    placed at the far right edge to avoid overlap.
-    """
     variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
     value_map = {
         'R (M0)': survey_row['R'],
@@ -246,9 +245,9 @@ def radar_chart(survey_row, school_name):
                 text="↻ <b>Milestone cycle direction (clockwise)</b>",
                 xref="paper",
                 yref="paper",
-                x=1.0,                # far right edge
-                y=0.95,               # slightly lower to avoid top margin
-                xanchor='right',      # anchor text to the right
+                x=1.0,
+                y=0.95,
+                xanchor='right',
                 yanchor='top',
                 showarrow=False,
                 font=dict(size=14, color=USTP_DARK_BLUE),
@@ -260,17 +259,18 @@ def radar_chart(survey_row, school_name):
             )
         ],
         height=500,
-        margin=dict(l=60, r=80, t=80, b=60)   # extra right margin for annotation
+        margin=dict(l=60, r=80, t=80, b=60)
     )
     return fig
 
-# ---------- End of radar chart ----------
-
+# ---------- Research Outputs Dashboard with new scatter plot ----------
 def research_outputs_dashboard(metadata_df, school_id, school_name):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     if school_meta.empty:
         st.info(f"No research outputs for {school_name}.")
         return
+
+    # Theme Distribution
     theme_counts = school_meta['theme'].value_counts().reset_index()
     theme_counts.columns = ['Theme', 'Count']
     fig_theme = px.bar(theme_counts, x='Theme', y='Count', title=f"Theme Distribution – {school_name}", color='Theme', color_discrete_sequence=[USTP_GOLD, DEPED_RED, USTP_DARK_BLUE])
@@ -279,6 +279,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
         top_theme = theme_counts.iloc[0]['Theme']
         st.caption(f"📝 Research outputs are most concentrated in '{top_theme}'. This suggests the school’s research focus area.")
 
+    # Publication Status
     status_counts = school_meta['status'].value_counts().reset_index()
     status_counts.columns = ['Status', 'Count']
     fig_status = px.bar(status_counts, x='Status', y='Count', title=f"Publication Status – {school_name}", color='Status', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_MAROON])
@@ -289,6 +290,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
         pub_rate = (published/total*100) if total>0 else 0
         st.caption(f"📝 {pub_rate:.1f}% of research outputs are published. A higher publication rate often correlates with greater institutional recognition.")
 
+    # Utilisation Rate
     utilised = school_meta['utilized_by_school'].sum() if 'utilized_by_school' in school_meta.columns else 0
     total = len(school_meta)
     util_rate = (utilised / total * 100) if total > 0 else 0
@@ -296,12 +298,66 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
               help="Percentage of research outputs from this school that have been adopted into practice (e.g., new teaching strategies, policy changes).")
     st.caption(f"📝 {'High utilisation indicates strong translation of research into practice.' if util_rate > 70 else 'Moderate or low utilisation suggests a gap between research production and practical adoption.'}")
 
+    # Teacher Productivity (Top 10)
     teacher_counts = school_meta['teacher_name'].value_counts().reset_index().head(10)
     teacher_counts.columns = ['Teacher', 'Number of Outputs']
     fig_teacher = px.bar(teacher_counts, x='Number of Outputs', y='Teacher', orientation='h', title=f"Teacher Productivity (Top 10) – {school_name}", color='Number of Outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
     st.plotly_chart(fig_teacher, use_container_width=True)
     if not teacher_counts.empty:
         st.caption(f"📝 The most productive teacher has {teacher_counts.iloc[0]['Number of Outputs']} research outputs. Encouraging collaborative research could further strengthen culture.")
+
+    # ---- YEARS OF SERVICE vs RESEARCH OUTPUTS (Scatter Plot with Trend Line) ----
+    if 'years_of_service' in school_meta.columns and not school_meta['years_of_service'].isna().all():
+        teacher_summary = school_meta.groupby('teacher_name').agg(
+            output_count=('document_type', 'count'),
+            years_of_service=('years_of_service', 'first')
+        ).reset_index()
+        teacher_summary = teacher_summary.dropna(subset=['years_of_service'])
+        if len(teacher_summary) > 1:
+            x = teacher_summary['years_of_service']
+            y = teacher_summary['output_count']
+            # Trend line
+            z = np.polyfit(x, y, 1)
+            p = np.poly1d(z)
+            trend_x = np.linspace(x.min(), x.max(), 100)
+            trend_y = p(trend_x)
+            fig_service = go.Figure()
+            fig_service.add_trace(go.Scatter(
+                x=x, y=y, mode='markers',
+                marker=dict(size=12, color=USTP_GOLD, line=dict(color=USTP_DARK_BLUE, width=1)),
+                text=teacher_summary['teacher_name'],
+                hoverinfo='text+x+y',
+                name='Teachers'
+            ))
+            fig_service.add_trace(go.Scatter(
+                x=trend_x, y=trend_y, mode='lines',
+                line=dict(color=USTP_DARK_BLUE, width=2, dash='dash'),
+                name='Trend'
+            ))
+            fig_service.update_layout(
+                title=f"Years of Service vs Research Outputs – {school_name}",
+                xaxis_title="Years of Service",
+                yaxis_title="Number of Research Outputs",
+                font=dict(color=USTP_DARK_BLUE),
+                showlegend=True,
+                height=400
+            )
+            st.plotly_chart(fig_service, use_container_width=True)
+            # Interpretation
+            avg_output = teacher_summary['output_count'].mean()
+            avg_service = teacher_summary['years_of_service'].mean()
+            slope = z[0]
+            if slope > 0.1:
+                direction = "increases"
+            elif slope < -0.1:
+                direction = "decreases"
+            else:
+                direction = "stays relatively stable"
+            st.caption(f"📝 On average, teachers have {avg_service:.1f} years of service and produce {avg_output:.1f} outputs. The trend line suggests that research output {direction} with years of experience.")
+        else:
+            st.info("Insufficient data for a meaningful scatter plot (need at least 2 teachers).")
+    else:
+        st.info("📝 'years_of_service' column not found or all values are missing in metadata. To enable experience vs output analysis, add this column to your CSV file.")
 
 def cycle_research_correlation(agent, metadata_df, school_id):
     if not agent.cycle_improvements:
@@ -478,7 +534,7 @@ if survey_file is not None and metadata_file is not None:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
                     agent.real_id = school_ids[idx]
-                for agent in st.session_state.sim.agents:
+                for agent in st.session_state.sim.agents):
                     school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
                     agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
                     agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
@@ -664,7 +720,7 @@ if survey_file is not None and metadata_file is not None:
                         - **Research Culture Sustainability Index (RCSI):** Cumulative strength of the research ecosystem, derived from Impact Realization (M) and Collaboration (P).
                         - **Improvement per Completed Cycle:** Each bar shows the RCSI contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
                         - **Radar Chart:** Current snapshot of the seven milestone‑linked variables – the ideal is a balanced, high‑value shape.
-                        - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, and teacher productivity.
+                        - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, and experience vs output.
                         - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
                         """)
 
