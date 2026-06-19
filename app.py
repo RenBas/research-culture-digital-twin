@@ -426,8 +426,43 @@ with st.sidebar:
     with col_buttons[1]: step_btn = st.button("Step (1 month)", use_container_width=True)
     with col_buttons[2]: reset_btn = st.button("Reset", use_container_width=True)
     export_btn = st.button("Export results (CSV)", use_container_width=True)
+    
     st.markdown("---")
+    
+    # ---- NEW: Download CSV Templates ----
+    st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Download Templates</h3>", unsafe_allow_html=True)
+    st.caption("Download blank CSV templates to fill with your data.")
+    
+    # Survey Template
+    survey_template = """month,school_id_no,school_name,R,A,C,S,I,P,M
+2026-01,1,School_1,0.32,0.41,0.28,0.15,0.14,0.19,0.08"""
+    
+    # Metadata Template
+    metadata_template = """upload_date,teacher_name,school_id_no,document_type,title,theme,status,publication_link,utilized_by_school,utilization_date,year_undertaken,years_of_service
+2026-03-15,Anna Reyes,1,abstract,Improving Reading,Teaching Strategies,published,https://doi.org/10.1234,True,2026-02-10,2025,10"""
+    
+    col_t1, col_t2 = st.columns(2)
+    with col_t1:
+        st.download_button(
+            label="📄 Survey Template (CSV)",
+            data=survey_template,
+            file_name="quarterly_survey_template.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    with col_t2:
+        st.download_button(
+            label="📄 Metadata Template (CSV)",
+            data=metadata_template,
+            file_name="research_metadata_template.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    
+    st.markdown("---")
+    
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Data Upload</h3>", unsafe_allow_html=True)
+    st.caption("Upload your filled CSV files below:")
     survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
     metadata_file = st.file_uploader("Upload research metadata (CSV)", type=["csv"], key="metadata")
 
@@ -527,7 +562,7 @@ if survey_file is not None and metadata_file is not None:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
                     agent.real_id = school_ids[idx]
-                for agent in st.session_state.sim.agents:  # <-- FIXED: removed extra ')'
+                for agent in st.session_state.sim.agents:
                     school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
                     agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
                     agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
