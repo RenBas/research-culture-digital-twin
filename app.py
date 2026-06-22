@@ -735,13 +735,13 @@ if survey_file is not None and metadata_file is not None:
                 st.dataframe(df_show_sorted[['teacher_name', 'year_undertaken', 'title', 'theme', 'status', 'utilized_by_school']].head(10))
             else:
                 st.info("No research outputs for this school.")
-            
+
             # Simulation actions
             if run_btn:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
                     agent.real_id = school_ids[idx]
-                for agent in st.session_state.sim.agents):
+                for agent in st.session_state.sim.agents:  # <--- FIXED: removed extra parenthesis
                     school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
                     agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
                     agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
@@ -768,7 +768,7 @@ if survey_file is not None and metadata_file is not None:
                         h['milestone'].append(agent.current_milestone)
                         h['running_outcome'].append(agent.running_total_outcome)
                 st.rerun()
-            
+
             if step_btn:
                 m = 1
                 if use_survey:
@@ -788,7 +788,7 @@ if survey_file is not None and metadata_file is not None:
                     h['milestone'].append(agent.current_milestone)
                     h['running_outcome'].append(agent.running_total_outcome)
                 st.rerun()
-            
+
             if reset_btn:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
@@ -803,7 +803,7 @@ if survey_file is not None and metadata_file is not None:
                 st.session_state.total_months = 0
                 st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
                 st.rerun()
-            
+
             if st.session_state.total_months > 0:
                 hist = st.session_state.history.get(selected_school_id, None)
                 agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
@@ -850,7 +850,7 @@ if survey_file is not None and metadata_file is not None:
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
 
-                    # Division‑Level Analysis – capture returned metrics
+                    # Division-Level Analysis – capture returned metrics
                     with st.expander("🏢 Division‑Level Analysis"):
                         div_metrics = division_level_analysis(survey_df, metadata_df, st.session_state.history, st.session_state.sim.agents, dark_mode)
 
