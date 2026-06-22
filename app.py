@@ -15,24 +15,155 @@ USTP_GOLD = "#F5A623"
 DEPED_RED = "#D32F2F"
 DEPED_MAROON = "#8B0000"
 LIGHT_BG = "#F8F9FA"
+DARK_BG = "#1E1E1E"
+DARK_TEXT = "#FFFFFF"
+LIGHT_TEXT = "#000000"
 
-st.markdown(f"""
-<style>
-    .reportview-container .main .block-container {{ padding-top: 2rem; }}
-    h1, h2, h3, .stMarkdown h1, .stMarkdown h2 {{ color: {USTP_DARK_BLUE}; }}
-    .sidebar .sidebar-content {{ background-color: {LIGHT_BG}; border-right: 2px solid {USTP_GOLD}; }}
-    .stButton > button {{ background-color: {USTP_DARK_BLUE}; color: white; border-radius: 5px; border: none; transition: 0.3s; }}
-    .stButton > button:hover {{ background-color: {USTP_GOLD}; color: {USTP_DARK_BLUE}; }}
-    .stButton > button:focus {{ box-shadow: none; }}
-    div[data-testid="column"]:nth-of-type(2) .stButton > button,
-    div[data-testid="column"]:nth-of-type(3) .stButton > button {{ background-color: #6C757D; }}
-    div[data-testid="column"]:nth-of-type(2) .stButton > button:hover,
-    div[data-testid="column"]:nth-of-type(3) .stButton > button:hover {{ background-color: {USTP_GOLD}; color: {USTP_DARK_BLUE}; }}
-    .stSelectbox label, .stNumberInput label, .stCheckbox label {{ font-weight: 500; color: {USTP_DARK_BLUE}; }}
-    .stDataFrame {{ border: 1px solid #ddd; }}
-    .css-1y4p8pa {{ background-color: {LIGHT_BG}; }}
-</style>
-""", unsafe_allow_html=True)
+# ------------------------------------------------------------
+# Apply Dark Mode CSS if enabled
+# ------------------------------------------------------------
+def apply_theme(dark_mode):
+    if dark_mode:
+        st.markdown(f"""
+        <style>
+            /* Main background */
+            .stApp {{
+                background-color: {DARK_BG} !important;
+                color: {DARK_TEXT} !important;
+            }}
+            /* Sidebar */
+            .sidebar .sidebar-content {{
+                background-color: #2E2E2E !important;
+                border-right: 2px solid {USTP_GOLD} !important;
+            }}
+            .sidebar .sidebar-content * {{
+                color: {DARK_TEXT} !important;
+            }}
+            /* Headings and text */
+            h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {{
+                color: {USTP_GOLD} !important;
+            }}
+            .stMarkdown, .stText, .stCaption, .stDataFrame {{
+                color: {DARK_TEXT} !important;
+            }}
+            /* Buttons */
+            .stButton > button {{
+                background-color: {USTP_DARK_BLUE} !important;
+                color: {DARK_TEXT} !important;
+                border: 1px solid {USTP_GOLD} !important;
+            }}
+            .stButton > button:hover {{
+                background-color: {USTP_GOLD} !important;
+                color: {USTP_DARK_BLUE} !important;
+            }}
+            /* Metric boxes */
+            .stMetric {{
+                background-color: #2E2E2E !important;
+                border: 1px solid {USTP_GOLD} !important;
+                border-radius: 5px;
+                padding: 10px;
+            }}
+            .stMetric label {{
+                color: {DARK_TEXT} !important;
+            }}
+            /* Tables */
+            .dataframe {{
+                background-color: #2E2E2E !important;
+                color: {DARK_TEXT} !important;
+            }}
+            .dataframe thead tr th {{
+                background-color: {USTP_DARK_BLUE} !important;
+                color: {DARK_TEXT} !important;
+            }}
+            .dataframe tbody tr {{
+                background-color: #2E2E2E !important;
+            }}
+            .dataframe tbody tr:hover {{
+                background-color: #3E3E3E !important;
+            }}
+            /* Expander headers */
+            .streamlit-expanderHeader {{
+                background-color: #2E2E2E !important;
+                color: {DARK_TEXT} !important;
+                border: 1px solid {USTP_GOLD} !important;
+            }}
+            .streamlit-expanderContent {{
+                background-color: #1E1E1E !important;
+                color: {DARK_TEXT} !important;
+            }}
+            /* Info, warning boxes */
+            .stAlert {{
+                background-color: #2E2E2E !important;
+                color: {DARK_TEXT} !important;
+                border: 1px solid {USTP_GOLD} !important;
+            }}
+            /* Select box, number input, checkbox labels */
+            .stSelectbox label, .stNumberInput label, .stCheckbox label {{
+                color: {DARK_TEXT} !important;
+            }}
+            /* Radio buttons */
+            .stRadio label {{
+                color: {DARK_TEXT} !important;
+            }}
+            /* File uploader */
+            .stFileUploader {{
+                background-color: #2E2E2E !important;
+                border: 1px dashed {USTP_GOLD} !important;
+            }}
+            .stFileUploader label {{
+                color: {DARK_TEXT} !important;
+            }}
+            /* Caption */
+            .stCaption {{
+                color: #CCCCCC !important;
+            }}
+            /* Main area background */
+            .main .block-container {{
+                background-color: {DARK_BG} !important;
+            }}
+            /* Div synopsis boxes */
+            .css-1y4p8pa {{
+                background-color: #2E2E2E !important;
+            }}
+            /* Custom synopsis divs (from markdown) */
+            div[style*="background-color: #E3F2FD"] {{
+                background-color: #2E2E2E !important;
+                border-left: 5px solid {USTP_GOLD} !important;
+                color: {DARK_TEXT} !important;
+            }}
+            div[style*="background-color: #E8F5E9"] {{
+                background-color: #2E2E2E !important;
+                border-left: 5px solid {USTP_GOLD} !important;
+                color: {DARK_TEXT} !important;
+            }}
+            /* RCSI table */
+            table {{
+                background-color: #2E2E2E !important;
+                color: {DARK_TEXT} !important;
+                border: 1px solid {USTP_GOLD} !important;
+            }}
+            table th {{
+                background-color: {USTP_DARK_BLUE} !important;
+                color: {DARK_TEXT} !important;
+            }}
+            table td {{
+                background-color: #2E2E2E !important;
+                color: {DARK_TEXT} !important;
+            }}
+            /* Plotly charts will be handled via template */
+        </style>
+        """, unsafe_allow_html=True)
+    else:
+        # Light mode CSS (default Streamlit, but we keep minimal overrides)
+        st.markdown("""
+        <style>
+            .stApp { background-color: #FFFFFF; }
+            .sidebar .sidebar-content { background-color: #F8F9FA; }
+            /* Restore default button colors */
+            .stButton > button { background-color: #0D2B5E; color: white; }
+            .stButton > button:hover { background-color: #F5A623; color: #0D2B5E; }
+        </style>
+        """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
 # Core simulation engine (unchanged)
@@ -199,7 +330,7 @@ def get_latest_survey(survey_df, school_id):
     return school_data.sort_values('month_num').iloc[-1]
 
 # ---------- Radar chart with annotation positioned at far right ----------
-def radar_chart(survey_row, school_name):
+def radar_chart(survey_row, school_name, dark_mode):
     variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
     value_map = {
         'R (M0)': survey_row['R'],
@@ -222,23 +353,26 @@ def radar_chart(survey_row, school_name):
         fillcolor=f"rgba(245, 166, 35, 0.3)"
     ))
 
+    # Set template based on dark mode
+    template = 'plotly_dark' if dark_mode else 'plotly_white'
     fig.update_layout(
+        template=template,
         polar=dict(
             radialaxis=dict(
                 visible=True,
                 range=[0, 1.0],
                 tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
                 ticktext=['0', '0.2', '0.4', '0.6', '0.8', '1.0'],
-                color=USTP_DARK_BLUE
+                color=USTP_GOLD if dark_mode else USTP_DARK_BLUE
             ),
             angularaxis=dict(
                 direction="clockwise",
-                tickfont=dict(size=11, color=USTP_DARK_BLUE)
+                tickfont=dict(size=11, color=USTP_GOLD if dark_mode else USTP_DARK_BLUE)
             )
         ),
         title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
         showlegend=False,
-        font=dict(color=USTP_DARK_BLUE),
+        font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
         annotations=[
             dict(
                 text="↻ <b>Milestone cycle direction (clockwise)</b>",
@@ -249,8 +383,8 @@ def radar_chart(survey_row, school_name):
                 xanchor='right',
                 yanchor='top',
                 showarrow=False,
-                font=dict(size=14, color=USTP_DARK_BLUE),
-                bgcolor="rgba(255,255,255,0.8)",
+                font=dict(size=14, color=USTP_GOLD),
+                bgcolor="rgba(0,0,0,0.6)" if dark_mode else "rgba(255,255,255,0.8)",
                 bordercolor=USTP_GOLD,
                 borderwidth=1,
                 borderpad=4,
@@ -263,23 +397,27 @@ def radar_chart(survey_row, school_name):
     return fig
 
 # ---------- Research Outputs Dashboard with scatter plot ----------
-def research_outputs_dashboard(metadata_df, school_id, school_name):
+def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     if school_meta.empty:
         st.info(f"No research outputs for {school_name}.")
         return
 
+    # Theme Distribution
     theme_counts = school_meta['theme'].value_counts().reset_index()
     theme_counts.columns = ['Theme', 'Count']
     fig_theme = px.bar(theme_counts, x='Theme', y='Count', title=f"Theme Distribution – {school_name}", color='Theme', color_discrete_sequence=[USTP_GOLD, DEPED_RED, USTP_DARK_BLUE])
+    fig_theme.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
     st.plotly_chart(fig_theme, use_container_width=True)
     if len(theme_counts) > 0:
         top_theme = theme_counts.iloc[0]['Theme']
         st.caption(f"📝 Research outputs are most concentrated in '{top_theme}'. This suggests the school’s research focus area.")
 
+    # Publication Status
     status_counts = school_meta['status'].value_counts().reset_index()
     status_counts.columns = ['Status', 'Count']
     fig_status = px.bar(status_counts, x='Status', y='Count', title=f"Publication Status – {school_name}", color='Status', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_MAROON])
+    fig_status.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
     st.plotly_chart(fig_status, use_container_width=True)
     if not status_counts.empty:
         published = status_counts[status_counts['Status']=='published']['Count'].sum()
@@ -287,6 +425,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
         pub_rate = (published/total*100) if total>0 else 0
         st.caption(f"📝 {pub_rate:.1f}% of research outputs are published. A higher publication rate often correlates with greater institutional recognition.")
 
+    # Utilisation Rate
     utilised = school_meta['utilized_by_school'].sum() if 'utilized_by_school' in school_meta.columns else 0
     total = len(school_meta)
     util_rate = (utilised / total * 100) if total > 0 else 0
@@ -294,9 +433,11 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
               help="Percentage of research outputs from this school that have been adopted into practice (e.g., new teaching strategies, policy changes).")
     st.caption(f"📝 {'High utilisation indicates strong translation of research into practice.' if util_rate > 70 else 'Moderate or low utilisation suggests a gap between research production and practical adoption.'}")
 
+    # Teacher Productivity (Top 10)
     teacher_counts = school_meta['teacher_name'].value_counts().reset_index().head(10)
     teacher_counts.columns = ['Teacher', 'Number of Outputs']
     fig_teacher = px.bar(teacher_counts, x='Number of Outputs', y='Teacher', orientation='h', title=f"Teacher Productivity (Top 10) – {school_name}", color='Number of Outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
+    fig_teacher.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
     st.plotly_chart(fig_teacher, use_container_width=True)
     if not teacher_counts.empty:
         st.caption(f"📝 The most productive teacher has {teacher_counts.iloc[0]['Number of Outputs']} research outputs. Encouraging collaborative research could further strengthen culture.")
@@ -332,9 +473,10 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
                 title=f"Years of Service vs Research Outputs – {school_name}",
                 xaxis_title="Years of Service",
                 yaxis_title="Number of Research Outputs",
-                font=dict(color=USTP_DARK_BLUE),
+                font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
                 showlegend=True,
-                height=400
+                height=400,
+                template='plotly_dark' if dark_mode else 'plotly_white'
             )
             st.plotly_chart(fig_service, use_container_width=True)
             avg_output = teacher_summary['output_count'].mean()
@@ -352,7 +494,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name):
     else:
         st.info("📝 'years_of_service' column not found or all values are missing in metadata. To enable experience vs output analysis, add this column to your CSV file.")
 
-def cycle_research_correlation(agent, metadata_df, school_id):
+def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     if not agent.cycle_improvements:
         st.info("No cycles completed yet for this school.")
         return
@@ -368,8 +510,14 @@ def cycle_research_correlation(agent, metadata_df, school_id):
     fig.add_trace(go.Scatter(x=[c.cycle_number for c in agent.cycle_improvements], y=cumulative_outputs,
                              mode='markers+lines', marker=dict(size=10, color=USTP_GOLD),
                              line=dict(color=USTP_DARK_BLUE), name='Research outputs'))
-    fig.update_layout(title="Cycle vs Cumulative Research Outputs", xaxis_title="Cycle Number",
-                      yaxis_title="Number of Research Outputs (cumulative)", showlegend=False, font=dict(color=USTP_DARK_BLUE))
+    fig.update_layout(
+        title="Cycle vs Cumulative Research Outputs",
+        xaxis_title="Cycle Number",
+        yaxis_title="Number of Research Outputs (cumulative)",
+        showlegend=False,
+        font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
+        template='plotly_dark' if dark_mode else 'plotly_white'
+    )
     st.plotly_chart(fig, use_container_width=True)
     if len(cumulative_outputs) >= 2:
         increase = cumulative_outputs[-1] - cumulative_outputs[-2]
@@ -405,8 +553,14 @@ def interpret_avg_milestone(avg_milestone):
 st.set_page_config(page_title="7-Milestone Research Culture Sustainability Framework", layout="wide")
 st.markdown(f"<h1 style='text-align: center; color: {USTP_DARK_BLUE};'>7‑Milestone Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
 
+# Sidebar
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Policy Levers & Simulation Controls</h2>", unsafe_allow_html=True)
+    
+    # Dark Mode toggle
+    dark_mode = st.checkbox("🌙 Dark Mode", value=False)
+    apply_theme(dark_mode)
+    
     col1, col2 = st.columns(2)
     with col1:
         u_train = st.slider("Training freq.", 0.0, 1.0, 0.5, 0.05)
@@ -429,15 +583,13 @@ with st.sidebar:
     
     st.markdown("---")
     
-    # ---- NEW: Download CSV Templates ----
+    # ---- Download CSV Templates ----
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Download Templates</h3>", unsafe_allow_html=True)
     st.caption("Download blank CSV templates to fill with your data.")
     
-    # Survey Template
     survey_template = """month,school_id_no,school_name,R,A,C,S,I,P,M
 2026-01,1,School_1,0.32,0.41,0.28,0.15,0.14,0.19,0.08"""
     
-    # Metadata Template
     metadata_template = """upload_date,teacher_name,school_id_no,document_type,title,theme,status,publication_link,utilized_by_school,utilization_date,year_undertaken,years_of_service
 2026-03-15,Anna Reyes,1,abstract,Improving Reading,Teaching Strategies,published,https://doi.org/10.1234,True,2026-02-10,2025,10"""
     
@@ -466,6 +618,7 @@ with st.sidebar:
     survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
     metadata_file = st.file_uploader("Upload research metadata (CSV)", type=["csv"], key="metadata")
 
+# Main area
 if survey_file is not None and metadata_file is not None:
     try:
         survey_df = pd.read_csv(survey_file)
@@ -579,6 +732,7 @@ if survey_file is not None and metadata_file is not None:
                 if hist and agent:
                     # Main plots
                     fig1 = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress", "Research Culture Sustainability Index (RCSI)", "Improvement per Completed Cycle"))
+                    # Use USTP colors
                     colors = ['#1E88E5', USTP_GOLD, '#8E44AD', '#2ECC71', '#E67E22', DEPED_RED, '#1ABC9C']
                     vars_ = ['R','A','C','S','I','P','M']
                     for i, var in enumerate(vars_):
@@ -591,7 +745,9 @@ if survey_file is not None and metadata_file is not None:
                         fig1.add_trace(go.Bar(x=cycles, y=improvements, name='RCSI per cycle', marker_color=USTP_DARK_BLUE), row=2, col=2)
                     else:
                         fig1.add_annotation(text="No cycles completed yet", xref="x2 domain", yref="y2 domain", x=0.5, y=0.5, showarrow=False, row=2, col=2)
-                    fig1.update_layout(height=800, showlegend=True, font=dict(color=USTP_DARK_BLUE))
+                    # Apply dark template if enabled
+                    template = 'plotly_dark' if dark_mode else 'plotly_white'
+                    fig1.update_layout(height=800, showlegend=True, font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE), template=template)
                     fig1.update_xaxes(title_text="Month", row=1, col=1)
                     fig1.update_yaxes(title_text="Value (0-1)", row=1, col=1)
                     fig1.update_xaxes(title_text="Month", row=1, col=2)
@@ -606,14 +762,14 @@ if survey_file is not None and metadata_file is not None:
                     latest = get_latest_survey(survey_df, selected_school_id)
                     if latest is not None:
                         latest_dict = latest.to_dict()
-                        st.plotly_chart(radar_chart(latest_dict, selected_school_name), use_container_width=True)
+                        st.plotly_chart(radar_chart(latest_dict, selected_school_name, dark_mode), use_container_width=True)
                     else:
                         st.info("No survey data for current quarter.")
 
                     with st.expander("📚 Research Outputs Dashboard (for selected school)"):
-                        research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name)
+                        research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name, dark_mode)
                     with st.expander("🔄 Cycle vs Research Outputs"):
-                        cycle_research_correlation(agent, metadata_df, selected_school_id)
+                        cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
 
                     # RCSI interpretation table
                     st.markdown("### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
@@ -664,7 +820,7 @@ if survey_file is not None and metadata_file is not None:
                     Overall, the school is on a path toward research culture sustainability, but further policy support may be needed to accelerate cycle completion.
                     """
                     st.markdown(f"""
-                    <div style="background-color: #E3F2FD; border-left: 5px solid {USTP_DARK_BLUE}; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                    <div style="background-color: {'#2E2E2E' if dark_mode else '#E3F2FD'}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {DARK_TEXT if dark_mode else 'inherit'};">
                     <b>📌 School {selected_school_id} ({selected_school_name}) – Sustainability Synopsis</b><br>
                     {coherent_text}
                     </div>
@@ -729,7 +885,7 @@ if survey_file is not None and metadata_file is not None:
                     div_util_rate = (total_utilised / total_research_outputs * 100) if total_research_outputs > 0 else 0
 
                     division_html = f"""
-                    <div style="background-color: #E8F5E9; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px;">
+                    <div style="background-color: {'#2E2E2E' if dark_mode else '#E8F5E9'}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {DARK_TEXT if dark_mode else 'inherit'};">
                     <b>🏢 Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
                     • Average milestone = {avg_milestone:.1f} → {avg_milestone_interpretation}<br>
                     • Total completed cycles across all schools = {total_cycles}<br>
