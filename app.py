@@ -6,6 +6,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 from dataclasses import dataclass
 from typing import List, Dict
+import math
 
 # ============================================================
 # USTP + DepEd Colour Palette
@@ -26,140 +27,41 @@ def apply_theme(dark_mode):
     if dark_mode:
         st.markdown(f"""
         <style>
-            /* Main background */
-            .stApp {{
-                background-color: {DARK_BG} !important;
-                color: {DARK_TEXT} !important;
-            }}
-            /* Sidebar */
-            .sidebar .sidebar-content {{
-                background-color: #2E2E2E !important;
-                border-right: 2px solid {USTP_GOLD} !important;
-            }}
-            .sidebar .sidebar-content * {{
-                color: {DARK_TEXT} !important;
-            }}
-            /* Headings and text */
-            h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {{
-                color: {USTP_GOLD} !important;
-            }}
-            .stMarkdown, .stText, .stCaption, .stDataFrame {{
-                color: {DARK_TEXT} !important;
-            }}
-            /* Buttons */
-            .stButton > button {{
-                background-color: {USTP_DARK_BLUE} !important;
-                color: {DARK_TEXT} !important;
-                border: 1px solid {USTP_GOLD} !important;
-            }}
-            .stButton > button:hover {{
-                background-color: {USTP_GOLD} !important;
-                color: {USTP_DARK_BLUE} !important;
-            }}
-            /* Metric boxes */
-            .stMetric {{
-                background-color: #2E2E2E !important;
-                border: 1px solid {USTP_GOLD} !important;
-                border-radius: 5px;
-                padding: 10px;
-            }}
-            .stMetric label {{
-                color: {DARK_TEXT} !important;
-            }}
-            /* Tables */
-            .dataframe {{
-                background-color: #2E2E2E !important;
-                color: {DARK_TEXT} !important;
-            }}
-            .dataframe thead tr th {{
-                background-color: {USTP_DARK_BLUE} !important;
-                color: {DARK_TEXT} !important;
-            }}
-            .dataframe tbody tr {{
-                background-color: #2E2E2E !important;
-            }}
-            .dataframe tbody tr:hover {{
-                background-color: #3E3E3E !important;
-            }}
-            /* Expander headers */
-            .streamlit-expanderHeader {{
-                background-color: #2E2E2E !important;
-                color: {DARK_TEXT} !important;
-                border: 1px solid {USTP_GOLD} !important;
-            }}
-            .streamlit-expanderContent {{
-                background-color: #1E1E1E !important;
-                color: {DARK_TEXT} !important;
-            }}
-            /* Info, warning boxes */
-            .stAlert {{
-                background-color: #2E2E2E !important;
-                color: {DARK_TEXT} !important;
-                border: 1px solid {USTP_GOLD} !important;
-            }}
-            /* Select box, number input, checkbox labels */
-            .stSelectbox label, .stNumberInput label, .stCheckbox label {{
-                color: {DARK_TEXT} !important;
-            }}
-            /* Radio buttons */
-            .stRadio label {{
-                color: {DARK_TEXT} !important;
-            }}
-            /* File uploader */
-            .stFileUploader {{
-                background-color: #2E2E2E !important;
-                border: 1px dashed {USTP_GOLD} !important;
-            }}
-            .stFileUploader label {{
-                color: {DARK_TEXT} !important;
-            }}
-            /* Caption */
-            .stCaption {{
-                color: #CCCCCC !important;
-            }}
-            /* Main area background */
-            .main .block-container {{
-                background-color: {DARK_BG} !important;
-            }}
-            /* Div synopsis boxes */
-            .css-1y4p8pa {{
-                background-color: #2E2E2E !important;
-            }}
-            /* Custom synopsis divs (from markdown) */
-            div[style*="background-color: #E3F2FD"] {{
-                background-color: #2E2E2E !important;
-                border-left: 5px solid {USTP_GOLD} !important;
-                color: {DARK_TEXT} !important;
-            }}
-            div[style*="background-color: #E8F5E9"] {{
-                background-color: #2E2E2E !important;
-                border-left: 5px solid {USTP_GOLD} !important;
-                color: {DARK_TEXT} !important;
-            }}
-            /* RCSI table */
-            table {{
-                background-color: #2E2E2E !important;
-                color: {DARK_TEXT} !important;
-                border: 1px solid {USTP_GOLD} !important;
-            }}
-            table th {{
-                background-color: {USTP_DARK_BLUE} !important;
-                color: {DARK_TEXT} !important;
-            }}
-            table td {{
-                background-color: #2E2E2E !important;
-                color: {DARK_TEXT} !important;
-            }}
-            /* Plotly charts will be handled via template */
+            .stApp {{ background-color: {DARK_BG} !important; color: {DARK_TEXT} !important; }}
+            .sidebar .sidebar-content {{ background-color: #2E2E2E !important; border-right: 2px solid {USTP_GOLD} !important; }}
+            .sidebar .sidebar-content * {{ color: {DARK_TEXT} !important; }}
+            h1, h2, h3, h4, h5, h6, .stMarkdown h1, .stMarkdown h2, .stMarkdown h3 {{ color: {USTP_GOLD} !important; }}
+            .stMarkdown, .stText, .stCaption, .stDataFrame {{ color: {DARK_TEXT} !important; }}
+            .stButton > button {{ background-color: {USTP_DARK_BLUE} !important; color: {DARK_TEXT} !important; border: 1px solid {USTP_GOLD} !important; }}
+            .stButton > button:hover {{ background-color: {USTP_GOLD} !important; color: {USTP_DARK_BLUE} !important; }}
+            .stMetric {{ background-color: #2E2E2E !important; border: 1px solid {USTP_GOLD} !important; border-radius: 5px; padding: 10px; }}
+            .stMetric label {{ color: {DARK_TEXT} !important; }}
+            .dataframe {{ background-color: #2E2E2E !important; color: {DARK_TEXT} !important; }}
+            .dataframe thead tr th {{ background-color: {USTP_DARK_BLUE} !important; color: {DARK_TEXT} !important; }}
+            .dataframe tbody tr {{ background-color: #2E2E2E !important; }}
+            .dataframe tbody tr:hover {{ background-color: #3E3E3E !important; }}
+            .streamlit-expanderHeader {{ background-color: #2E2E2E !important; color: {DARK_TEXT} !important; border: 1px solid {USTP_GOLD} !important; }}
+            .streamlit-expanderContent {{ background-color: #1E1E1E !important; color: {DARK_TEXT} !important; }}
+            .stAlert {{ background-color: #2E2E2E !important; color: {DARK_TEXT} !important; border: 1px solid {USTP_GOLD} !important; }}
+            .stSelectbox label, .stNumberInput label, .stCheckbox label {{ color: {DARK_TEXT} !important; }}
+            .stRadio label {{ color: {DARK_TEXT} !important; }}
+            .stFileUploader {{ background-color: #2E2E2E !important; border: 1px dashed {USTP_GOLD} !important; }}
+            .stFileUploader label {{ color: {DARK_TEXT} !important; }}
+            .stCaption {{ color: #CCCCCC !important; }}
+            .main .block-container {{ background-color: {DARK_BG} !important; }}
+            .css-1y4p8pa {{ background-color: #2E2E2E !important; }}
+            div[style*="background-color: #E3F2FD"] {{ background-color: #2E2E2E !important; border-left: 5px solid {USTP_GOLD} !important; color: {DARK_TEXT} !important; }}
+            div[style*="background-color: #E8F5E9"] {{ background-color: #2E2E2E !important; border-left: 5px solid {USTP_GOLD} !important; color: {DARK_TEXT} !important; }}
+            table {{ background-color: #2E2E2E !important; color: {DARK_TEXT} !important; border: 1px solid {USTP_GOLD} !important; }}
+            table th {{ background-color: {USTP_DARK_BLUE} !important; color: {DARK_TEXT} !important; }}
+            table td {{ background-color: #2E2E2E !important; color: {DARK_TEXT} !important; }}
         </style>
         """, unsafe_allow_html=True)
     else:
-        # Light mode CSS (default Streamlit, but we keep minimal overrides)
         st.markdown("""
         <style>
             .stApp { background-color: #FFFFFF; }
             .sidebar .sidebar-content { background-color: #F8F9FA; }
-            /* Restore default button colors */
             .stButton > button { background-color: #0D2B5E; color: white; }
             .stButton > button:hover { background-color: #F5A623; color: #0D2B5E; }
         </style>
@@ -275,7 +177,7 @@ class Simulation:
         return self.agents[idx]
 
 # ------------------------------------------------------------
-# Data processing functions
+# Data processing functions (updated for new columns)
 # ------------------------------------------------------------
 def process_survey(survey_df):
     if survey_df is None:
@@ -318,6 +220,11 @@ def process_metadata(metadata_df):
             metadata_df['publication_link'] = ''
         if 'years_of_service' not in metadata_df.columns:
             metadata_df['years_of_service'] = None
+        # New columns: teacher_rank and educational_attainment (optional)
+        if 'teacher_rank' not in metadata_df.columns:
+            metadata_df['teacher_rank'] = None
+        if 'educational_attainment' not in metadata_df.columns:
+            metadata_df['educational_attainment'] = None
         metadata_df['upload_date'] = pd.to_datetime(metadata_df['upload_date'])
         return metadata_df, None
     except Exception as e:
@@ -353,7 +260,6 @@ def radar_chart(survey_row, school_name, dark_mode):
         fillcolor=f"rgba(245, 166, 35, 0.3)"
     ))
 
-    # Set template based on dark mode
     template = 'plotly_dark' if dark_mode else 'plotly_white'
     fig.update_layout(
         template=template,
@@ -396,7 +302,7 @@ def radar_chart(survey_row, school_name, dark_mode):
     )
     return fig
 
-# ---------- Research Outputs Dashboard with scatter plot ----------
+# ---------- Research Outputs Dashboard (updated with new charts) ----------
 def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     if school_meta.empty:
@@ -413,6 +319,17 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
         top_theme = theme_counts.iloc[0]['Theme']
         st.caption(f"📝 Research outputs are most concentrated in '{top_theme}'. This suggests the school’s research focus area.")
 
+    # ---- NEW: Theme Utilisation Rate ----
+    if 'utilized_by_school' in school_meta.columns:
+        theme_util = school_meta.groupby('theme')['utilized_by_school'].mean().reset_index()
+        theme_util.columns = ['Theme', 'Utilisation Rate']
+        fig_theme_util = px.bar(theme_util, x='Theme', y='Utilisation Rate', title=f"Theme Utilisation Rate – {school_name}", color='Utilisation Rate', color_continuous_scale=['#F5A623', '#0D2B5E'])
+        fig_theme_util.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+        st.plotly_chart(fig_theme_util, use_container_width=True)
+        top_util_theme = theme_util.loc[theme_util['Utilisation Rate'].idxmax(), 'Theme'] if not theme_util.empty else None
+        if top_util_theme:
+            st.caption(f"📝 The theme with the highest utilisation rate is '{top_util_theme}'. This indicates that research in this area is most likely to be translated into practice.")
+
     # Publication Status
     status_counts = school_meta['status'].value_counts().reset_index()
     status_counts.columns = ['Status', 'Count']
@@ -425,7 +342,30 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
         pub_rate = (published/total*100) if total>0 else 0
         st.caption(f"📝 {pub_rate:.1f}% of research outputs are published. A higher publication rate often correlates with greater institutional recognition.")
 
-    # Utilisation Rate
+    # ---- NEW: Research Output Timeline (quarterly) ----
+    if 'upload_date' in school_meta.columns:
+        school_meta['quarter'] = school_meta['upload_date'].dt.to_period('Q').astype(str)
+        output_timeline = school_meta.groupby('quarter').size().reset_index(name='count')
+        if not output_timeline.empty:
+            fig_timeline = px.line(output_timeline, x='quarter', y='count', title=f"Research Output Timeline – {school_name}", markers=True)
+            fig_timeline.update_layout(template='plotly_dark' if dark_mode else 'plotly_white', xaxis_title='Quarter', yaxis_title='Number of Outputs')
+            st.plotly_chart(fig_timeline, use_container_width=True)
+            latest_count = output_timeline.iloc[-1]['count'] if not output_timeline.empty else 0
+            st.caption(f"📝 In the latest quarter, {latest_count} research outputs were produced. A rising trend indicates growing research productivity.")
+
+    # ---- NEW: Research Output Utilisation Rate Over Time ----
+    if 'upload_date' in school_meta.columns and 'utilized_by_school' in school_meta.columns:
+        school_meta['quarter'] = school_meta['upload_date'].dt.to_period('Q').astype(str)
+        util_over_time = school_meta.groupby('quarter')['utilized_by_school'].mean().reset_index()
+        util_over_time.columns = ['quarter', 'utilisation_rate']
+        if not util_over_time.empty:
+            fig_util_time = px.line(util_over_time, x='quarter', y='utilisation_rate', title=f"Utilisation Rate Over Time – {school_name}", markers=True)
+            fig_util_time.update_layout(template='plotly_dark' if dark_mode else 'plotly_white', xaxis_title='Quarter', yaxis_title='Utilisation Rate')
+            st.plotly_chart(fig_util_time, use_container_width=True)
+            latest_util = util_over_time.iloc[-1]['utilisation_rate'] if not util_over_time.empty else 0
+            st.caption(f"📝 In the latest quarter, the utilisation rate is {latest_util:.1%}. A stable or increasing rate indicates effective translation of research into practice.")
+
+    # Utilisation Rate (school-level)
     utilised = school_meta['utilized_by_school'].sum() if 'utilized_by_school' in school_meta.columns else 0
     total = len(school_meta)
     util_rate = (utilised / total * 100) if total > 0 else 0
@@ -442,7 +382,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     if not teacher_counts.empty:
         st.caption(f"📝 The most productive teacher has {teacher_counts.iloc[0]['Number of Outputs']} research outputs. Encouraging collaborative research could further strengthen culture.")
 
-    # ---- Years of Service vs Research Outputs (Scatter Plot with Trend Line) ----
+    # Years of Service vs Research Outputs (scatter with trend)
     if 'years_of_service' in school_meta.columns and not school_meta['years_of_service'].isna().all():
         teacher_summary = school_meta.groupby('teacher_name').agg(
             output_count=('document_type', 'count'),
@@ -457,42 +397,63 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
             trend_x = np.linspace(x.min(), x.max(), 100)
             trend_y = p(trend_x)
             fig_service = go.Figure()
-            fig_service.add_trace(go.Scatter(
-                x=x, y=y, mode='markers',
-                marker=dict(size=12, color=USTP_GOLD, line=dict(color=USTP_DARK_BLUE, width=1)),
-                text=teacher_summary['teacher_name'],
-                hoverinfo='text+x+y',
-                name='Teachers'
-            ))
-            fig_service.add_trace(go.Scatter(
-                x=trend_x, y=trend_y, mode='lines',
-                line=dict(color=USTP_DARK_BLUE, width=2, dash='dash'),
-                name='Trend'
-            ))
-            fig_service.update_layout(
-                title=f"Years of Service vs Research Outputs – {school_name}",
-                xaxis_title="Years of Service",
-                yaxis_title="Number of Research Outputs",
-                font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
-                showlegend=True,
-                height=400,
-                template='plotly_dark' if dark_mode else 'plotly_white'
-            )
+            fig_service.add_trace(go.Scatter(x=x, y=y, mode='markers', marker=dict(size=12, color=USTP_GOLD, line=dict(color=USTP_DARK_BLUE, width=1)), text=teacher_summary['teacher_name'], hoverinfo='text+x+y', name='Teachers'))
+            fig_service.add_trace(go.Scatter(x=trend_x, y=trend_y, mode='lines', line=dict(color=USTP_DARK_BLUE, width=2, dash='dash'), name='Trend'))
+            fig_service.update_layout(template='plotly_dark' if dark_mode else 'plotly_white', title=f"Years of Service vs Research Outputs – {school_name}", xaxis_title="Years of Service", yaxis_title="Number of Research Outputs", font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE), showlegend=True, height=400)
             st.plotly_chart(fig_service, use_container_width=True)
             avg_output = teacher_summary['output_count'].mean()
             avg_service = teacher_summary['years_of_service'].mean()
             slope = z[0]
-            if slope > 0.1:
-                direction = "increases"
-            elif slope < -0.1:
-                direction = "decreases"
-            else:
-                direction = "stays relatively stable"
+            direction = "increases" if slope > 0.1 else "decreases" if slope < -0.1 else "stays relatively stable"
             st.caption(f"📝 On average, teachers have {avg_service:.1f} years of service and produce {avg_output:.1f} outputs. The trend line suggests that research output {direction} with years of experience.")
         else:
             st.info("Insufficient data for a meaningful scatter plot (need at least 2 teachers).")
     else:
         st.info("📝 'years_of_service' column not found or all values are missing in metadata. To enable experience vs output analysis, add this column to your CSV file.")
+
+    # ---- NEW: Top Teacher by Rank, Years of Service, and Educational Attainment ----
+    st.markdown("#### 🏆 Top Teacher by Category")
+    col_rank, col_service, col_edu = st.columns(3)
+    # By Rank
+    if 'teacher_rank' in school_meta.columns and not school_meta['teacher_rank'].isna().all():
+        rank_group = school_meta.groupby(['teacher_rank', 'teacher_name']).size().reset_index(name='count')
+        top_rank = rank_group.loc[rank_group.groupby('teacher_rank')['count'].idxmax()]
+        if not top_rank.empty:
+            with col_rank:
+                st.metric(label="Top by Rank", value=f"{top_rank.iloc[0]['teacher_name']}", help=f"Rank: {top_rank.iloc[0]['teacher_rank']} | Outputs: {top_rank.iloc[0]['count']}")
+    else:
+        with col_rank:
+            st.info("Rank data not provided.")
+
+    # By Years of Service (bracket)
+    if 'years_of_service' in school_meta.columns and not school_meta['years_of_service'].isna().all():
+        # Create brackets: 0-5, 6-10, 11-15, 16-20, 20+
+        def service_bracket(years):
+            if years <= 5: return "0-5"
+            elif years <= 10: return "6-10"
+            elif years <= 15: return "11-15"
+            elif years <= 20: return "16-20"
+            else: return "20+"
+        school_meta['service_bracket'] = school_meta['years_of_service'].apply(service_bracket)
+        bracket_group = school_meta.groupby(['service_bracket', 'teacher_name']).size().reset_index(name='count')
+        top_bracket = bracket_group.loc[bracket_group.groupby('service_bracket')['count'].idxmax()]
+        if not top_bracket.empty:
+            with col_service:
+                st.metric(label="Top by Service Bracket", value=f"{top_bracket.iloc[0]['teacher_name']}", help=f"Bracket: {top_bracket.iloc[0]['service_bracket']} | Outputs: {top_bracket.iloc[0]['count']}")
+    else:
+        with col_service:
+            st.info("Years of service data not provided.")
+
+    # By Educational Attainment
+    if 'educational_attainment' in school_meta.columns and not school_meta['educational_attainment'].isna().all():
+        edu_group = school_meta.groupby(['educational_attainment', 'teacher_name']).size().reset_index(name='count')
+        top_edu = edu_group.loc[edu_group.groupby('educational_attainment')['count'].idxmax()]
+        if not top_edu.empty:
+            with col_edu:
+                st.metric(label="Top by Education", value=f"{top_edu.iloc[0]['teacher_name']}", help=f"Education: {top_edu.iloc[0]['educational_attainment']} | Outputs: {top_edu.iloc[0]['count']}")
+    else:
+        with col_edu:
+            st.info("Educational attainment data not provided.")
 
 def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     if not agent.cycle_improvements:
@@ -510,14 +471,8 @@ def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     fig.add_trace(go.Scatter(x=[c.cycle_number for c in agent.cycle_improvements], y=cumulative_outputs,
                              mode='markers+lines', marker=dict(size=10, color=USTP_GOLD),
                              line=dict(color=USTP_DARK_BLUE), name='Research outputs'))
-    fig.update_layout(
-        title="Cycle vs Cumulative Research Outputs",
-        xaxis_title="Cycle Number",
-        yaxis_title="Number of Research Outputs (cumulative)",
-        showlegend=False,
-        font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
-        template='plotly_dark' if dark_mode else 'plotly_white'
-    )
+    fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white', title="Cycle vs Cumulative Research Outputs", xaxis_title="Cycle Number",
+                      yaxis_title="Number of Research Outputs (cumulative)", showlegend=False, font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE))
     st.plotly_chart(fig, use_container_width=True)
     if len(cumulative_outputs) >= 2:
         increase = cumulative_outputs[-1] - cumulative_outputs[-2]
@@ -528,8 +483,157 @@ def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     elif len(cumulative_outputs) == 1:
         st.caption("📝 First cycle completed. Continued research output will be needed to build sustainability.")
 
+# ---------- Division-Level Analysis ----------
+def division_level_analysis(survey_df, metadata_df, history_per_school, sim_agents, dark_mode):
+    st.markdown("### 🔍 Division‑Level Analysis")
+
+    # ---- 1. Teacher Productivity Leaderboard (All Schools) ----
+    st.markdown("#### 🏆 Teacher Productivity Leaderboard (Division‑Wide)")
+    if not metadata_df.empty:
+        teacher_summary = metadata_df.groupby(['teacher_name', 'school_id_no']).size().reset_index(name='total_outputs')
+        # Merge with school names from survey
+        school_names = survey_df[['school_id_no', 'school_name']].drop_duplicates()
+        teacher_summary = teacher_summary.merge(school_names, on='school_id_no', how='left')
+        # Add optional columns if available
+        if 'teacher_rank' in metadata_df.columns:
+            rank_info = metadata_df.groupby('teacher_name')['teacher_rank'].first().reset_index()
+            teacher_summary = teacher_summary.merge(rank_info, on='teacher_name', how='left')
+        if 'educational_attainment' in metadata_df.columns:
+            edu_info = metadata_df.groupby('teacher_name')['educational_attainment'].first().reset_index()
+            teacher_summary = teacher_summary.merge(edu_info, on='teacher_name', how='left')
+        if 'years_of_service' in metadata_df.columns:
+            service_info = metadata_df.groupby('teacher_name')['years_of_service'].first().reset_index()
+            teacher_summary = teacher_summary.merge(service_info, on='teacher_name', how='left')
+        # Sort by total outputs descending
+        teacher_summary = teacher_summary.sort_values('total_outputs', ascending=False).head(20)
+        st.dataframe(teacher_summary[['teacher_name', 'school_name', 'total_outputs', 'teacher_rank', 'educational_attainment', 'years_of_service']])
+        st.caption("📝 Top 20 teachers across the division by research output count. Use this to identify research champions.")
+
+    # ---- 2. Correlation Heatmap (Survey Variables vs Output Count) ----
+    st.markdown("#### 📊 Correlation Heatmap: Survey Variables vs Research Output Count")
+    # Aggregate survey data per school per quarter (average of R,A,C,S,I,P,M)
+    if survey_df is not None:
+        survey_agg = survey_df.groupby(['school_id_no', 'month_num'])[['R','A','C','S','I','P','M']].mean().reset_index()
+        # Count research outputs per school per quarter (using month_num from upload_date)
+        if not metadata_df.empty:
+            # Convert upload_date to month_num
+            meta = metadata_df.copy()
+            meta['month_num'] = meta['upload_date'].apply(lambda d: (d.year - 2026)*12 + d.month)
+            output_counts = meta.groupby(['school_id_no', 'month_num']).size().reset_index(name='output_count')
+            # Merge
+            merged = survey_agg.merge(output_counts, on=['school_id_no', 'month_num'], how='inner')
+            if not merged.empty:
+                corr = merged[['R','A','C','S','I','P','M','output_count']].corr()
+                fig_corr = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues', aspect='auto')
+                fig_corr.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+                st.plotly_chart(fig_corr, use_container_width=True)
+                # Interpret strongest correlation
+                corr_vals = corr['output_count'].drop('output_count')
+                top_var = corr_vals.abs().idxmax()
+                top_corr = corr_vals[top_var]
+                st.caption(f"📝 The variable most strongly correlated with research output is '{top_var}' (r = {top_corr:.2f}). {'Positive' if top_corr>0 else 'Negative'} correlation suggests that {'higher' if top_corr>0 else 'lower'} {top_var} is associated with more research outputs.")
+            else:
+                st.info("Insufficient data to compute correlation (need survey and metadata for the same quarters).")
+        else:
+            st.info("Metadata not available for correlation.")
+
+    # ---- 3. Milestone Transition Analysis ----
+    st.markdown("#### ⏱️ Milestone Transition Analysis (Average Months per Milestone)")
+    # We need simulation history. Use history_per_school to compute time spent per milestone.
+    if history_per_school:
+        milestone_durations = {}
+        for sid, hist in history_per_school.items():
+            if 'milestone' in hist and len(hist['milestone']) > 0:
+                # Compute duration in each milestone
+                milestone_list = hist['milestone']
+                months = list(range(1, len(milestone_list)+1))
+                # Find transition points
+                for i in range(1, len(milestone_list)):
+                    if milestone_list[i] != milestone_list[i-1]:
+                        # Transition from milestone_list[i-1] to milestone_list[i]
+                        duration = i - (milestone_list.index(milestone_list[i-1]) if milestone_list[i-1] in milestone_list[:i] else 0)
+                        # We'll simplify: compute average time per milestone across all schools.
+                        # For each school, compute time spent in each milestone.
+                        # We'll store in a list for averaging.
+                        pass  # Keep it simple: compute average by iterating and recording.
+        # Simplified: compute average duration per milestone across all agents.
+        # We'll loop through all agents and count months per milestone.
+        all_durations = {m: [] for m in range(7)}
+        for agent in sim_agents:
+            # We have agent's history in history_per_school[agent.real_id]
+            hist = history_per_school.get(agent.real_id)
+            if hist and 'milestone' in hist:
+                milestones = hist['milestone']
+                for i in range(1, len(milestones)):
+                    if milestones[i] != milestones[i-1]:
+                        # The agent spent i - start months in milestone milestones[i-1]
+                        start = milestones.index(milestones[i-1], 0, i) if milestones[i-1] in milestones[:i] else i-1
+                        duration = i - start
+                        all_durations[milestones[i-1]].append(duration)
+                # Add final duration (until end)
+                if milestones:
+                    last_milestone = milestones[-1]
+                    start = milestones.index(last_milestone, 0, len(milestones)) if last_milestone in milestones else len(milestones)-1
+                    duration = len(milestones) - start
+                    all_durations[last_milestone].append(duration)
+        # Compute averages
+        avg_durations = {m: np.mean(v) if v else np.nan for m, v in all_durations.items()}
+        durations_df = pd.DataFrame({
+            'Milestone': [f'M{i}' for i in range(7)],
+            'Avg Months': [avg_durations.get(i, np.nan) for i in range(7)]
+        }).dropna()
+        if not durations_df.empty:
+            fig_dur = px.bar(durations_df, x='Milestone', y='Avg Months', title="Average Months Spent per Milestone", color='Avg Months', color_continuous_scale=['#F5A623', '#0D2B5E'])
+            fig_dur.update_layout(template='plotly_dark' if dark_mode else 'plotly_white', xaxis_title='Milestone', yaxis_title='Average Months')
+            st.plotly_chart(fig_dur, use_container_width=True)
+            # Identify bottleneck
+            max_dur = durations_df.loc[durations_df['Avg Months'].idxmax()]
+            st.caption(f"📝 Schools spend the most time on average in Milestone {max_dur['Milestone']} ({max_dur['Avg Months']:.1f} months). This indicates a potential bottleneck for research culture progression.")
+        else:
+            st.info("Not enough transition data to compute milestone durations.")
+    else:
+        st.info("No simulation history available. Run the simulation first to see milestone transitions.")
+
+# ---------- Comparative School Analysis ----------
+def school_comparison_dashboard(survey_df, history_per_school, school_info, selected_school_ids, dark_mode):
+    st.markdown("### 📊 Comparative School Analysis")
+    if not selected_school_ids:
+        st.info("Select at least one school to compare.")
+        return
+
+    # Get history for selected schools
+    histories = {}
+    for sid in selected_school_ids:
+        hist = history_per_school.get(sid)
+        if hist:
+            histories[sid] = hist
+
+    if not histories:
+        st.info("No simulation history for selected schools. Run the simulation first.")
+        return
+
+    # Plot Variable Evolution overlay
+    fig_comp = go.Figure()
+    for sid, hist in histories.items():
+        school_name = school_info[school_info['school_id_no']==sid]['school_name'].values[0] if sid in school_info['school_id_no'].values else f"School {sid}"
+        fig_comp.add_trace(go.Scatter(x=hist['month'], y=hist['R'], mode='lines', name=f"{school_name} - R"))
+        # Add other variables? To avoid clutter, we'll plot only RCSI and milestone.
+    # Actually, we'll create two subplots: one for RCSI and one for Milestone.
+    fig_comp = make_subplots(rows=2, cols=1, subplot_titles=("RCSI Comparison", "Milestone Comparison"))
+    for sid, hist in histories.items():
+        school_name = school_info[school_info['school_id_no']==sid]['school_name'].values[0] if sid in school_info['school_id_no'].values else f"School {sid}"
+        fig_comp.add_trace(go.Scatter(x=hist['month'], y=hist['running_outcome'], mode='lines', name=f"{school_name} RCSI"), row=1, col=1)
+        fig_comp.add_trace(go.Scatter(x=hist['month'], y=hist['milestone'], mode='lines', name=f"{school_name} Milestone"), row=2, col=1)
+    fig_comp.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
+    fig_comp.update_xaxes(title_text="Month", row=1, col=1)
+    fig_comp.update_yaxes(title_text="RCSI", row=1, col=1)
+    fig_comp.update_xaxes(title_text="Month", row=2, col=1)
+    fig_comp.update_yaxes(title_text="Milestone", row=2, col=1)
+    st.plotly_chart(fig_comp, use_container_width=True)
+    st.caption("📝 Overlay of RCSI and Milestone progress for selected schools. Compare which schools are advancing faster and which are lagging.")
+
 # ------------------------------------------------------------
-# Helper to interpret average milestone with requested ranges
+# Helper to interpret average milestone
 # ------------------------------------------------------------
 def interpret_avg_milestone(avg_milestone):
     if avg_milestone < 0.5:
@@ -553,14 +657,10 @@ def interpret_avg_milestone(avg_milestone):
 st.set_page_config(page_title="7-Milestone Research Culture Sustainability Framework", layout="wide")
 st.markdown(f"<h1 style='text-align: center; color: {USTP_DARK_BLUE};'>7‑Milestone Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
 
-# Sidebar
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Policy Levers & Simulation Controls</h2>", unsafe_allow_html=True)
-    
-    # Dark Mode toggle
     dark_mode = st.checkbox("🌙 Dark Mode", value=False)
     apply_theme(dark_mode)
-    
     col1, col2 = st.columns(2)
     with col1:
         u_train = st.slider("Training freq.", 0.0, 1.0, 0.5, 0.05)
@@ -580,39 +680,19 @@ with st.sidebar:
     with col_buttons[1]: step_btn = st.button("Step (1 month)", use_container_width=True)
     with col_buttons[2]: reset_btn = st.button("Reset", use_container_width=True)
     export_btn = st.button("Export results (CSV)", use_container_width=True)
-    
     st.markdown("---")
-    
-    # ---- Download CSV Templates ----
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Download Templates</h3>", unsafe_allow_html=True)
     st.caption("Download blank CSV templates to fill with your data.")
-    
     survey_template = """month,school_id_no,school_name,R,A,C,S,I,P,M
 2026-01,1,School_1,0.32,0.41,0.28,0.15,0.14,0.19,0.08"""
-    
-    metadata_template = """upload_date,teacher_name,school_id_no,document_type,title,theme,status,publication_link,utilized_by_school,utilization_date,year_undertaken,years_of_service
-2026-03-15,Anna Reyes,1,abstract,Improving Reading,Teaching Strategies,published,https://doi.org/10.1234,True,2026-02-10,2025,10"""
-    
+    metadata_template = """upload_date,teacher_name,school_id_no,document_type,title,theme,status,publication_link,utilized_by_school,utilization_date,year_undertaken,years_of_service,teacher_rank,educational_attainment
+2026-03-15,Anna Reyes,1,abstract,Improving Reading,Teaching Strategies,published,https://doi.org/10.1234,True,2026-02-10,2025,10,Teacher II,Master's"""
     col_t1, col_t2 = st.columns(2)
     with col_t1:
-        st.download_button(
-            label="📄 Survey Template (CSV)",
-            data=survey_template,
-            file_name="quarterly_survey_template.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
+        st.download_button(label="📄 Survey Template (CSV)", data=survey_template, file_name="quarterly_survey_template.csv", mime="text/csv", use_container_width=True)
     with col_t2:
-        st.download_button(
-            label="📄 Metadata Template (CSV)",
-            data=metadata_template,
-            file_name="research_metadata_template.csv",
-            mime="text/csv",
-            use_container_width=True
-        )
-    
+        st.download_button(label="📄 Metadata Template (CSV)", data=metadata_template, file_name="research_metadata_template.csv", mime="text/csv", use_container_width=True)
     st.markdown("---")
-    
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Data Upload</h3>", unsafe_allow_html=True)
     st.caption("Upload your filled CSV files below:")
     survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
@@ -658,7 +738,7 @@ if survey_file is not None and metadata_file is not None:
             else:
                 st.info("No research outputs for this school.")
             
-            # Simulation actions
+            # Simulation actions (run, step, reset) - same as before
             if run_btn:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
@@ -730,9 +810,8 @@ if survey_file is not None and metadata_file is not None:
                 hist = st.session_state.history.get(selected_school_id, None)
                 agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
                 if hist and agent:
-                    # Main plots
+                    # Main plots (unchanged)
                     fig1 = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress", "Research Culture Sustainability Index (RCSI)", "Improvement per Completed Cycle"))
-                    # Use USTP colors
                     colors = ['#1E88E5', USTP_GOLD, '#8E44AD', '#2ECC71', '#E67E22', DEPED_RED, '#1ABC9C']
                     vars_ = ['R','A','C','S','I','P','M']
                     for i, var in enumerate(vars_):
@@ -745,7 +824,6 @@ if survey_file is not None and metadata_file is not None:
                         fig1.add_trace(go.Bar(x=cycles, y=improvements, name='RCSI per cycle', marker_color=USTP_DARK_BLUE), row=2, col=2)
                     else:
                         fig1.add_annotation(text="No cycles completed yet", xref="x2 domain", yref="y2 domain", x=0.5, y=0.5, showarrow=False, row=2, col=2)
-                    # Apply dark template if enabled
                     template = 'plotly_dark' if dark_mode else 'plotly_white'
                     fig1.update_layout(height=800, showlegend=True, font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE), template=template)
                     fig1.update_xaxes(title_text="Month", row=1, col=1)
@@ -766,10 +844,25 @@ if survey_file is not None and metadata_file is not None:
                     else:
                         st.info("No survey data for current quarter.")
 
+                    # Research Outputs Dashboard (updated)
                     with st.expander("📚 Research Outputs Dashboard (for selected school)"):
                         research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name, dark_mode)
+
+                    # Cycle vs Research Outputs
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
+
+                    # ---- Division-Level Analysis (new expandable) ----
+                    with st.expander("🏢 Division‑Level Analysis"):
+                        division_level_analysis(survey_df, metadata_df, st.session_state.history, st.session_state.sim.agents, dark_mode)
+
+                    # ---- Comparative School Analysis (new expandable) ----
+                    with st.expander("📊 Comparative School Analysis"):
+                        # Multiselect for schools
+                        all_schools = school_info['school_id_no'].tolist()
+                        selected_comparison = st.multiselect("Select schools to compare", options=all_schools, default=all_schools[:3] if len(all_schools)>=3 else all_schools, format_func=lambda x: f"ID {x}: {school_info[school_info['school_id_no']==x]['school_name'].values[0]}")
+                        if selected_comparison:
+                            school_comparison_dashboard(survey_df, st.session_state.history, school_info, selected_comparison, dark_mode)
 
                     # RCSI interpretation table
                     st.markdown("### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
@@ -783,7 +876,7 @@ if survey_file is not None and metadata_file is not None:
                     | 0.8 – 1.0 | Very High | Excellent vitality; research culture fully embedded. |
                     """)
 
-                    # Per‑school synopsis
+                    # Per‑school synopsis (coherent)
                     rcsi_val = agent.running_total_outcome
                     rcsi_level = "Exceptional"
                     for low,high,lev in [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]:
@@ -826,7 +919,7 @@ if survey_file is not None and metadata_file is not None:
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # Division synopsis
+                    # Division synopsis (unchanged)
                     total_schools = len(st.session_state.sim.agents)
                     early_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
                     advanced_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
@@ -904,7 +997,9 @@ if survey_file is not None and metadata_file is not None:
                         - **Research Culture Sustainability Index (RCSI):** Cumulative strength of the research ecosystem, derived from Impact Realization (M) and Collaboration (P).
                         - **Improvement per Completed Cycle:** Each bar shows the RCSI contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
                         - **Radar Chart:** Current snapshot of the seven milestone‑linked variables – the ideal is a balanced, high‑value shape.
-                        - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, and experience vs output.
+                        - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, experience vs output, timeline, and top teachers.
+                        - **Division‑Level Analysis:** Correlation heatmap, milestone transition bottlenecks, and teacher leaderboard.
+                        - **Comparative Analysis:** Overlay multiple schools' RCSI and milestone progress.
                         - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
                         """)
 
