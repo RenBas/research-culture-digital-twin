@@ -695,7 +695,7 @@ with st.sidebar:
     dark_mode = st.checkbox("🌙 Dark Mode", value=False)
     apply_theme(dark_mode)
 
-    # ---- Total Schools Loaded (Moved to top, just below Dark Mode) ----
+    # ---- Total Schools Loaded (Moved to top) ----
     st.metric(label="🏫 Total Schools Loaded", value=st.session_state.num_schools, help="Number of schools detected in the uploaded survey data.")
 
     st.markdown("---")
@@ -732,7 +732,6 @@ with st.sidebar:
         step_btn = st.button("⏭️ Step (1 month)", use_container_width=True)
     with col_buttons[2]:
         reset_btn = st.button("🔄 Reset", use_container_width=True)
-    # Helper text to clarify Run vs Step
     st.caption("**Run:** Full forecast for selected duration (resets history). **Step:** Advance one month without resetting (observe gradual changes).")
 
     st.markdown("---")
@@ -776,7 +775,6 @@ if survey_file is not None and metadata_file is not None:
             st.error(f"Metadata error: {meta_error}")
         else:
             actual_count = len(school_info)
-            # Update session state for the static metric
             if st.session_state.num_schools != actual_count:
                 st.session_state.num_schools = actual_count
                 st.rerun()
@@ -790,8 +788,9 @@ if survey_file is not None and metadata_file is not None:
             selected_school_id = int(selected_school_label.split(":")[0].split()[1])
             selected_school_name = school_info[school_info['school_id_no']==selected_school_id]['school_name'].values[0]
             
-            # ---- TWEAK 2: Header for Baseline Data ----
-            st.markdown("### 📋 Baseline from Uploaded Data")
+            # ---- Centered Header for Baseline ----
+            st.markdown("## 📋 Baseline from Uploaded Data")
+            st.markdown("---")
             
             # Research Outputs (Recent)
             st.markdown("### Research Outputs (Recent)")
@@ -802,11 +801,25 @@ if survey_file is not None and metadata_file is not None:
             else:
                 st.info("No research outputs for this school.")
             
-            # Radar Chart
+            # Radar Chart with Legend (using columns)
             latest = get_latest_survey(survey_df, selected_school_id)
             if latest is not None:
-                latest_dict = latest.to_dict()
-                st.plotly_chart(radar_chart(latest_dict, selected_school_name, dark_mode), use_container_width=True)
+                col_left, col_right = st.columns([1, 3])
+                with col_left:
+                    st.markdown("**📌 Legend:**")
+                    legend_text = """
+                    - **R (M0)** → Readiness & Relevance
+                    - **A (M1)** → Awareness to Action
+                    - **C (M2)** → Capacity Spark
+                    - **S (M3)** → Structured Support
+                    - **I (M4)** → Institutional Anchoring
+                    - **P (M5)** → Community of Practice
+                    - **M (M6)** → Impact Realization
+                    """
+                    st.markdown(legend_text)
+                with col_right:
+                    latest_dict = latest.to_dict()
+                    st.plotly_chart(radar_chart(latest_dict, selected_school_name, dark_mode), use_container_width=True)
             else:
                 st.info("No survey data for current quarter.")
             
@@ -840,7 +853,6 @@ if survey_file is not None and metadata_file is not None:
                 """, unsafe_allow_html=True)
 
             # ---------- SIMULATION DEPENDENT ----------
-            # ---- TWEAK 3: Header for Simulated Data (placed before simulation outputs) ----
             # Initialize simulation state
             if 'sim' not in st.session_state:
                 st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
@@ -926,8 +938,9 @@ if survey_file is not None and metadata_file is not None:
 
             # ---------- Simulation-dependent outputs ----------
             if st.session_state.total_months > 0:
-                # Place the "Simulated Data" header here, right before the simulation results
-                st.markdown("### ⚙️ Simulated Data")
+                # ---- Centered Header for Simulated Data ----
+                st.markdown("## ⚙️ Simulated Data")
+                st.markdown("---")
                 
                 hist = st.session_state.history.get(selected_school_id, None)
                 agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
@@ -1074,7 +1087,6 @@ if survey_file is not None and metadata_file is not None:
                         gaps = bs['gaps']
                         if gaps:
                             st.markdown("#### 🔍 Baseline vs Simulation Comparison (Critical Gaps)")
-                            # Build table rows
                             table_data = []
                             var_names = {
                                 'R': 'Readiness',
@@ -1101,10 +1113,8 @@ if survey_file is not None and metadata_file is not None:
                                     "Simulation Value": f"{sim_val:.2f}",
                                     "Status": status
                                 })
-                            # Convert to DataFrame and display as table
                             df_compare = pd.DataFrame(table_data)
                             st.table(df_compare)
-                            # Summary interpretation
                             improving = sum(1 for v in gaps if getattr(agent, v) - baseline_vals[v] > 0.01)
                             regressing = sum(1 for v in gaps if getattr(agent, v) - baseline_vals[v] < -0.01)
                             if improving > regressing:
