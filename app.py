@@ -306,7 +306,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     if school_meta.empty:
         st.info(f"No research outputs for {school_name}.")
-        return None  # return None so caller can handle
+        return None
 
     # Theme Distribution
     theme_counts = school_meta['theme'].value_counts().reset_index()
@@ -317,7 +317,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     top_theme = theme_counts.iloc[0]['Theme'] if not theme_counts.empty else "N/A"
     st.caption(f"📝 Research outputs are most concentrated in '{top_theme}'. This suggests the school’s research focus area.")
 
-    # ---- NEW: Theme Utilisation Rate ----
+    # Theme Utilisation Rate
     if 'utilized_by_school' in school_meta.columns:
         theme_util = school_meta.groupby('theme')['utilized_by_school'].mean().reset_index()
         theme_util.columns = ['Theme', 'Utilisation Rate']
@@ -340,7 +340,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     pub_rate = (published/total*100) if total>0 else 0
     st.caption(f"📝 {pub_rate:.1f}% of research outputs are published. A higher publication rate often correlates with greater institutional recognition.")
 
-    # ---- NEW: Research Output Timeline (quarterly) ----
+    # Research Output Timeline (quarterly)
     output_timeline = None
     if 'upload_date' in school_meta.columns:
         school_meta['quarter'] = school_meta['upload_date'].dt.to_period('Q').astype(str)
@@ -352,7 +352,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
             latest_count = output_timeline.iloc[-1]['count'] if not output_timeline.empty else 0
             st.caption(f"📝 In the latest quarter, {latest_count} research outputs were produced. A rising trend indicates growing research productivity.")
 
-    # ---- NEW: Research Output Utilisation Rate Over Time ----
+    # Research Output Utilisation Rate Over Time
     util_timeline = None
     if 'upload_date' in school_meta.columns and 'utilized_by_school' in school_meta.columns:
         school_meta['quarter'] = school_meta['upload_date'].dt.to_period('Q').astype(str)
@@ -411,7 +411,7 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     else:
         st.info("📝 'years_of_service' column not found or all values are missing in metadata. To enable experience vs output analysis, add this column to your CSV file.")
 
-    # ---- NEW: Top Teacher by Category ----
+    # Top Teacher by Category
     st.markdown("#### 🏆 Top Teacher by Category")
     col_rank, col_service, col_edu = st.columns(3)
     top_rank_name = "N/A"
@@ -659,6 +659,8 @@ with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Policy Levers & Simulation Controls</h2>", unsafe_allow_html=True)
     dark_mode = st.checkbox("🌙 Dark Mode", value=False)
     apply_theme(dark_mode)
+
+    # ---- Policy Levers (Sliders) ----
     col1, col2 = st.columns(2)
     with col1:
         u_train = st.slider("Training freq.", 0.0, 1.0, 0.5, 0.05)
@@ -668,18 +670,33 @@ with st.sidebar:
         u_lead = st.slider("Leadership commit.", 0.0, 1.0, 0.5, 0.05)
         u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05)
     levers = {'u_train': u_train, 'u_mentor': u_mentor, 'u_budget': u_budget, 'u_lead': u_lead, 'u_collab': u_collab}
+
+    # ---- Simulation Parameters ----
     max_schools_allowed = 200
     num_schools = st.number_input("Number of schools", min_value=1, max_value=max_schools_allowed, value=20, step=1)
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
     random_events = st.checkbox("Enable random events", value=False)
     use_survey = st.checkbox("Override with survey data", value=True)
-    col_buttons = st.columns(3)
-    with col_buttons[0]: run_btn = st.button("Run", use_container_width=True)
-    with col_buttons[1]: step_btn = st.button("Step (1 month)", use_container_width=True)
-    with col_buttons[2]: reset_btn = st.button("Reset", use_container_width=True)
-    export_btn = st.button("Export results (CSV)", use_container_width=True)
+
     st.markdown("---")
-    st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Download Templates</h3>", unsafe_allow_html=True)
+    st.markdown("#### ⚙️ Simulation Actions")
+    # ---- Simulation Action Buttons ----
+    col_buttons = st.columns(3)
+    with col_buttons[0]:
+        run_btn = st.button("🚀 Run", use_container_width=True)
+    with col_buttons[1]:
+        step_btn = st.button("⏭️ Step (1 month)", use_container_width=True)
+    with col_buttons[2]:
+        reset_btn = st.button("🔄 Reset", use_container_width=True)
+
+    # ---- Export Data ----
+    st.markdown("---")
+    st.markdown("#### 📥 Export Data")
+    export_btn = st.button("📊 Export results (CSV)", use_container_width=True)
+
+    st.markdown("---")
+    # ---- Download Templates ----
+    st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>📄 Download Templates</h3>", unsafe_allow_html=True)
     st.caption("Download blank CSV templates to fill with your data.")
     survey_template = """month,school_id_no,school_name,R,A,C,S,I,P,M
 2026-01,1,School_1,0.32,0.41,0.28,0.15,0.14,0.19,0.08"""
@@ -690,13 +707,15 @@ with st.sidebar:
         st.download_button(label="📄 Survey Template (CSV)", data=survey_template, file_name="quarterly_survey_template.csv", mime="text/csv", use_container_width=True)
     with col_t2:
         st.download_button(label="📄 Metadata Template (CSV)", data=metadata_template, file_name="research_metadata_template.csv", mime="text/csv", use_container_width=True)
+
     st.markdown("---")
-    st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Data Upload</h3>", unsafe_allow_html=True)
+    # ---- Data Upload ----
+    st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>📂 Data Upload</h3>", unsafe_allow_html=True)
     st.caption("Upload your filled CSV files below:")
     survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
     metadata_file = st.file_uploader("Upload research metadata (CSV)", type=["csv"], key="metadata")
 
-# Main area
+# Main area (unchanged from previous version)
 if survey_file is not None and metadata_file is not None:
     try:
         survey_df = pd.read_csv(survey_file)
@@ -736,12 +755,12 @@ if survey_file is not None and metadata_file is not None:
             else:
                 st.info("No research outputs for this school.")
 
-            # Simulation actions
+            # Simulation actions (run, step, reset) - same as before
             if run_btn:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
                     agent.real_id = school_ids[idx]
-                for agent in st.session_state.sim.agents:  # <--- FIXED: removed extra parenthesis
+                for agent in st.session_state.sim.agents:
                     school_metadata = metadata_df[metadata_df['school_id_no'] == agent.real_id]
                     agent.A = min(1.0, agent.A + len(school_metadata[school_metadata['document_type']=='abstract'])*0.01)
                     agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
@@ -842,7 +861,7 @@ if survey_file is not None and metadata_file is not None:
                     else:
                         st.info("No survey data for current quarter.")
 
-                    # Research Outputs Dashboard (updated) – capture returned metrics
+                    # Research Outputs Dashboard
                     with st.expander("📚 Research Outputs Dashboard (for selected school)"):
                         school_metrics = research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name, dark_mode)
 
@@ -850,7 +869,7 @@ if survey_file is not None and metadata_file is not None:
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
 
-                    # Division-Level Analysis – capture returned metrics
+                    # Division‑Level Analysis
                     with st.expander("🏢 Division‑Level Analysis"):
                         div_metrics = division_level_analysis(survey_df, metadata_df, st.session_state.history, st.session_state.sim.agents, dark_mode)
 
@@ -1018,8 +1037,6 @@ if survey_file is not None and metadata_file is not None:
                     div_util_rate = (total_utilised / total_research_outputs * 100) if total_research_outputs > 0 else 0
 
                     # ---- Additional division insights from new metrics ----
-                    div_output_count = len(div_metadata)
-                    # Use division metrics from division_level_analysis
                     div_insights = div_metrics if 'div_metrics' in locals() else {}
                     top_div_teacher = div_insights.get('top_div_teacher', 'N/A')
                     top_div_school = div_insights.get('top_div_school', 'N/A')
@@ -1032,7 +1049,6 @@ if survey_file is not None and metadata_file is not None:
                     # Construct division insight sentences
                     output_trend_div = ""
                     if not metadata_df.empty and 'upload_date' in metadata_df.columns:
-                        # overall trend
                         div_timeline = metadata_df.groupby(metadata_df['upload_date'].dt.to_period('Q')).size()
                         if len(div_timeline) >= 2:
                             if div_timeline.iloc[-1] > div_timeline.iloc[-2]:
