@@ -695,8 +695,11 @@ with st.sidebar:
     dark_mode = st.checkbox("🌙 Dark Mode", value=False)
     apply_theme(dark_mode)
 
+    # ---- Total Schools Loaded (Moved to top, just below Dark Mode) ----
+    st.metric(label="🏫 Total Schools Loaded", value=st.session_state.num_schools, help="Number of schools detected in the uploaded survey data.")
+
     st.markdown("---")
-    # ---- Baseline Analysis Section (moved to top) ----
+    # ---- Baseline Analysis Section ----
     st.markdown("#### 📊 Baseline Analysis")
     baseline_btn = st.button("🔍 Analyze Baseline", use_container_width=True)
 
@@ -715,8 +718,6 @@ with st.sidebar:
 
     # ---- Simulation Parameters ----
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Simulation Parameters</h3>", unsafe_allow_html=True)
-    # Remove the number of schools slider; instead show static metric (updated after data upload)
-    st.metric(label="🏫 Total Schools Loaded", value=st.session_state.num_schools, help="Number of schools detected in the uploaded survey data.")
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
     random_events = st.checkbox("Enable random events", value=False)
     use_survey = st.checkbox("Override with survey data", value=True)
@@ -782,12 +783,15 @@ if survey_file is not None and metadata_file is not None:
 
             st.success(f"Loaded {actual_count} schools.")
             
-            # ---------- ALWAYS VISIBLE ----------
+            # ---------- ALWAYS VISIBLE (BASELINE DATA) ----------
             school_ids = school_info['school_id_no'].tolist()
             school_options = [f"ID {sid}: {school_info[school_info['school_id_no']==sid]['school_name'].values[0]}" for sid in school_ids]
             selected_school_label = st.selectbox("Select school", school_options, index=0)
             selected_school_id = int(selected_school_label.split(":")[0].split()[1])
             selected_school_name = school_info[school_info['school_id_no']==selected_school_id]['school_name'].values[0]
+            
+            # ---- TWEAK 2: Header for Baseline Data ----
+            st.markdown("### 📋 Baseline from Uploaded Data")
             
             # Research Outputs (Recent)
             st.markdown("### Research Outputs (Recent)")
@@ -836,6 +840,7 @@ if survey_file is not None and metadata_file is not None:
                 """, unsafe_allow_html=True)
 
             # ---------- SIMULATION DEPENDENT ----------
+            # ---- TWEAK 3: Header for Simulated Data (placed before simulation outputs) ----
             # Initialize simulation state
             if 'sim' not in st.session_state:
                 st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
@@ -921,6 +926,9 @@ if survey_file is not None and metadata_file is not None:
 
             # ---------- Simulation-dependent outputs ----------
             if st.session_state.total_months > 0:
+                # Place the "Simulated Data" header here, right before the simulation results
+                st.markdown("### ⚙️ Simulated Data")
+                
                 hist = st.session_state.history.get(selected_school_id, None)
                 agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
                 if hist and agent:
