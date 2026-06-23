@@ -691,11 +691,18 @@ if 'num_schools' not in st.session_state:
     st.session_state.num_schools = 20
 
 with st.sidebar:
-    st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Policy Levers & Simulation Controls</h2>", unsafe_allow_html=True)
+    st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
     dark_mode = st.checkbox("🌙 Dark Mode", value=False)
     apply_theme(dark_mode)
 
+    st.markdown("---")
+    # ---- Baseline Analysis Section (moved to top) ----
+    st.markdown("#### 📊 Baseline Analysis")
+    baseline_btn = st.button("🔍 Analyze Baseline", use_container_width=True)
+
+    st.markdown("---")
     # ---- Policy Levers ----
+    st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Policy Levers</h3>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
         u_train = st.slider("Training freq.", 0.0, 1.0, 0.5, 0.05)
@@ -707,15 +714,11 @@ with st.sidebar:
     levers = {'u_train': u_train, 'u_mentor': u_mentor, 'u_budget': u_budget, 'u_lead': u_lead, 'u_collab': u_collab}
 
     # ---- Simulation Parameters ----
+    st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Simulation Parameters</h3>", unsafe_allow_html=True)
     num_schools = st.number_input("Number of schools", min_value=1, max_value=st.session_state.max_schools, value=st.session_state.num_schools, step=1, key='num_schools_input')
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
     random_events = st.checkbox("Enable random events", value=False)
     use_survey = st.checkbox("Override with survey data", value=True)
-
-    st.markdown("---")
-    # ---- Baseline Analysis Section ----
-    st.markdown("#### 📊 Baseline Analysis")
-    baseline_btn = st.button("🔍 Analyze Baseline", use_container_width=True)
 
     st.markdown("---")
     # ---- Simulation Actions ----
@@ -727,6 +730,8 @@ with st.sidebar:
         step_btn = st.button("⏭️ Step (1 month)", use_container_width=True)
     with col_buttons[2]:
         reset_btn = st.button("🔄 Reset", use_container_width=True)
+    # Helper text to clarify Run vs Step
+    st.caption("**Run:** Full forecast for selected duration (resets history). **Step:** Advance one month without resetting (observe gradual changes).")
 
     st.markdown("---")
     # ---- Export ----
@@ -773,7 +778,6 @@ if survey_file is not None and metadata_file is not None:
             if st.session_state.max_schools != actual_count or st.session_state.num_schools != actual_count:
                 st.session_state.max_schools = actual_count
                 st.session_state.num_schools = actual_count
-                # Force rerun to update slider
                 st.rerun()
 
             st.success(f"Loaded {actual_count} schools.")
@@ -812,6 +816,7 @@ if survey_file is not None and metadata_file is not None:
                 if latest_row is not None:
                     baseline_synopsis = generate_baseline_synopsis(latest_row, selected_school_name, metadata_df)
                     st.session_state.baseline_synopsis = baseline_synopsis
+                    st.session_state.baseline_survey_row = latest_row.to_dict()  # store for comparison
                 else:
                     st.warning("No survey data available to generate baseline.")
             
@@ -1053,6 +1058,56 @@ if survey_file is not None and metadata_file is not None:
                     {coherent_text}
                     </div>
                     """, unsafe_allow_html=True)
+
+                    # ===================== BASELINE vs SIMULATION COMPARISON =====================
+                    if 'baseline_synopsis' in st.session_state and 'baseline_survey_row' in st.session_state:
+                        bs = st.session_state.baseline_synopsis
+                        baseline_vals = st.session_state.baseline_survey_row
+                        gaps = bs['gaps']
+                        if gaps:
+                            st.markdown("#### 🔍 Baseline vs Simulation Comparison (Critical Gaps)")
+                            comparison_lines = []
+                            for var in gaps:
+                                base_val = baseline_vals[var]
+                                sim_val = getattr(agent, var)
+                                diff = sim_val - base_val
+                                if diff > 0.01:
+                                    arrow = "↑ (Improving)"
+                                    status = f"**Improved** from {base_val:.2f} to {sim_val:.2f}"
+                                elif diff < -0.01:
+                                    arrow = "↓ (Regressing)"
+                                    status = f"**Regressed** from {base_val:.2f} to {sim_val:.2f}"
+                                else:
+                                    arrow = "→ (Stable)"
+                                    status = f"**Stable** at {sim_val:.2f}"
+                                # Map variable to full name
+                                var_names = {
+                                    'R': 'Readiness',
+                                    'A': 'Awareness',
+                                    'C': 'Capacity',
+                                    'S': 'Structured Support',
+                                    'I': 'Institutional Anchoring',
+                                    'P': 'Community of Practice',
+                                    'M': 'Impact Realization'
+                                }
+                                comparison_lines.append(f"- **{var_names[var]} ({var})**: {arrow} – {status}.")
+                            # Add interpretation
+                            improving = sum(1 for v in gaps if getattr(agent, v) - baseline_vals[v] > 0.01)
+                            regressing = sum(1 for v in gaps if getattr(agent, v) - baseline_vals[v] < -0.01)
+                            if improving > regressing:
+                                summary = "Overall, the simulation indicates that most critical gaps are improving. The policy levers appear to be effective."
+                            elif regressing > improving:
+                                summary = "Overall, the simulation indicates that several critical gaps are regressing. Consider adjusting policy levers."
+                            else:
+                                summary = "Overall, the simulation shows mixed or stable results for critical gaps. Further analysis may be needed."
+
+                            comparison_text = "\n".join(comparison_lines)
+                            st.markdown(f"""
+                            <div style="background-color: {'#2E2E2E' if dark_mode else '#FFF8E1'}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {DARK_TEXT if dark_mode else 'inherit'};">
+                            {comparison_text}
+                            <br><b>Interpretation:</b> {summary}
+                            </div>
+                            """, unsafe_allow_html=True)
 
                     # ===================== DIVISION SYNOPSIS =====================
                     total_schools = len(st.session_state.sim.agents)
