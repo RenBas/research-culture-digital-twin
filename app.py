@@ -235,7 +235,7 @@ def get_latest_survey(survey_df, school_id):
         return None
     return school_data.sort_values('month_num').iloc[-1]
 
-# ---------- Radar chart with circular arrow ----------
+# ---------- Radar chart (original clean version with bottom annotation) ----------
 def radar_chart(survey_row, school_name, dark_mode):
     variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
     value_map = {
@@ -249,7 +249,6 @@ def radar_chart(survey_row, school_name, dark_mode):
     }
     values = [value_map[v] for v in variables]
 
-    # Main radar trace
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(
         r=values,
@@ -260,45 +259,13 @@ def radar_chart(survey_row, school_name, dark_mode):
         fillcolor=f"rgba(245, 166, 35, 0.3)"
     ))
 
-    # ---- Circular arrow (dashed circle + arrowhead) ----
-    # Circle at r=1.02 (just outside max radial axis)
-    circle_r = 1.02
-    n_points = 100
-    angles_deg = np.linspace(0, 360, n_points)
-    fig.add_trace(go.Scatterpolar(
-        r=[circle_r] * n_points,
-        theta=angles_deg,
-        mode='lines',
-        line=dict(color=USTP_DARK_BLUE, width=1.5, dash='dash'),
-        showlegend=False,
-        hoverinfo='skip'
-    ))
-
-    # Arrowhead at angle 0° (top), pointing clockwise (to the right)
-    # We'll create a small triangle: base at r=1.02, tip at r=1.07, angular spread ±4°
-    tip_r = 1.07
-    base_r = 1.02
-    angle_center = 0
-    angle_spread = 4
-    fig.add_trace(go.Scatterpolar(
-        r=[base_r, base_r, tip_r, base_r],
-        theta=[-angle_spread, angle_spread, angle_center, -angle_spread],
-        mode='lines',
-        line=dict(color=USTP_DARK_BLUE, width=1),
-        fill='toself',
-        fillcolor=USTP_DARK_BLUE,
-        showlegend=False,
-        hovertemplate='↻ Milestone cycle direction (clockwise)<extra></extra>'
-    ))
-
-    # Layout
     template = 'plotly_dark' if dark_mode else 'plotly_white'
     fig.update_layout(
         template=template,
         polar=dict(
             radialaxis=dict(
                 visible=True,
-                range=[0, 1.08],  # slightly above 1 to show arrow
+                range=[0, 1.0],
                 tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
                 ticktext=['0', '0.2', '0.4', '0.6', '0.8', '1.0'],
                 color=USTP_GOLD if dark_mode else USTP_DARK_BLUE
@@ -311,8 +278,21 @@ def radar_chart(survey_row, school_name, dark_mode):
         title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
         showlegend=False,
         font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
+        annotations=[
+            dict(
+                text="↻ Milestone cycle direction (clockwise)",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=-0.12,
+                showarrow=False,
+                font=dict(size=13, color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
+                bgcolor="rgba(255,255,255,0.0)",
+                bordercolor="rgba(0,0,0,0)"
+            )
+        ],
         height=500,
-        margin=dict(l=60, r=80, t=80, b=60)
+        margin=dict(l=60, r=80, t=80, b=100)  # increased bottom margin for annotation
     )
     return fig
 
@@ -986,7 +966,7 @@ if survey_file is not None and metadata_file is not None:
                         selected_comparison = st.multiselect(
                             "Select schools to compare (choose at least two)",
                             options=all_schools,
-                            default=[],  # empty default
+                            default=[],
                             format_func=lambda x: f"ID {x}: {school_info[school_info['school_id_no']==x]['school_name'].values[0]}"
                         )
                         school_comparison_dashboard(survey_df, st.session_state.history, school_info, selected_comparison, dark_mode)
