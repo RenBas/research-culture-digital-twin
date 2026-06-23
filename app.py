@@ -301,7 +301,7 @@ def radar_chart(survey_row, school_name, dark_mode):
     )
     return fig
 
-# ---------- Research Outputs Dashboard (always visible) ----------
+# ---------- Research Outputs Dashboard ----------
 def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     if school_meta.empty:
@@ -457,7 +457,6 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
         with col_edu:
             st.info("Educational attainment data not provided.")
 
-    # Return metrics for synopsis
     return {
         'top_theme': top_theme,
         'top_util_theme': top_util_theme,
@@ -650,17 +649,12 @@ def generate_baseline_synopsis(survey_row, school_name, metadata_df):
     variables = ['R','A','C','S','I','P','M']
     values = {v: survey_row[v] for v in variables}
     
-    # Determine approximate milestone based on thresholds
-    # Simple heuristic: if all >=0.8 => M6, if P>=0.8 => M5, etc.
-    # But we can just show the values and identify strengths/gaps.
     strengths = [v for v in variables if values[v] >= 0.6]
     gaps = [v for v in variables if values[v] <= 0.3]
     moderate = [v for v in variables if 0.3 < values[v] < 0.6]
     
-    # Baseline RCSI (simple average)
     baseline_rcsi = np.mean([values[v] for v in variables])
     
-    # Actionable recommendations
     recommendations = []
     if 'C' in gaps:
         recommendations.append("🔹 **Priority 1: Build Teacher Capacity (C).** Conduct training workshops on research methods and data analysis.")
@@ -690,6 +684,12 @@ def generate_baseline_synopsis(survey_row, school_name, metadata_df):
 st.set_page_config(page_title="7-Milestone Research Culture Sustainability Framework", layout="wide")
 st.markdown(f"<h1 style='text-align: center; color: {USTP_DARK_BLUE};'>7‑Milestone Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
 
+# Initialize session state variables for slider
+if 'max_schools' not in st.session_state:
+    st.session_state.max_schools = 200
+if 'num_schools' not in st.session_state:
+    st.session_state.num_schools = 20
+
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Policy Levers & Simulation Controls</h2>", unsafe_allow_html=True)
     dark_mode = st.checkbox("🌙 Dark Mode", value=False)
@@ -707,9 +707,7 @@ with st.sidebar:
     levers = {'u_train': u_train, 'u_mentor': u_mentor, 'u_budget': u_budget, 'u_lead': u_lead, 'u_collab': u_collab}
 
     # ---- Simulation Parameters ----
-    max_schools_allowed = 200
-    # This will be updated after data upload
-    num_schools = st.number_input("Number of schools", min_value=1, max_value=max_schools_allowed, value=20, step=1, key="num_schools_slider")
+    num_schools = st.number_input("Number of schools", min_value=1, max_value=st.session_state.max_schools, value=st.session_state.num_schools, step=1, key='num_schools_input')
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
     random_events = st.checkbox("Enable random events", value=False)
     use_survey = st.checkbox("Override with survey data", value=True)
@@ -770,14 +768,15 @@ if survey_file is not None and metadata_file is not None:
         elif meta_error:
             st.error(f"Metadata error: {meta_error}")
         else:
-            st.success(f"Loaded {len(school_info)} schools.")
-            
-            # Update the "Number of schools" slider to match the actual data
-            actual_school_count = len(school_info)
-            # We need to update the slider's max and value dynamically.
-            # Use st.session_state to store the updated value.
-            st.session_state.num_schools_slider = actual_school_count
-            # The slider will now show the correct value after rerun.
+            actual_count = len(school_info)
+            # Update session state for slider
+            if st.session_state.max_schools != actual_count or st.session_state.num_schools != actual_count:
+                st.session_state.max_schools = actual_count
+                st.session_state.num_schools = actual_count
+                # Force rerun to update slider
+                st.rerun()
+
+            st.success(f"Loaded {actual_count} schools.")
             
             # ---------- ALWAYS VISIBLE ----------
             school_ids = school_info['school_id_no'].tolist()
@@ -807,7 +806,7 @@ if survey_file is not None and metadata_file is not None:
             with st.expander("📚 Research Outputs Dashboard (for selected school)"):
                 school_metrics = research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name, dark_mode)
             
-            # ---------- BASELINE SYNOPSIS (on button click) ----------
+            # ---------- BASELINE SYNOPSIS ----------
             if baseline_btn:
                 latest_row = get_latest_survey(survey_df, selected_school_id)
                 if latest_row is not None:
@@ -816,11 +815,9 @@ if survey_file is not None and metadata_file is not None:
                 else:
                     st.warning("No survey data available to generate baseline.")
             
-            # Display baseline synopsis if available
             if 'baseline_synopsis' in st.session_state:
                 bs = st.session_state.baseline_synopsis
                 st.markdown("### 📊 Baseline Synopsis")
-                # Create a styled box
                 st.markdown(f"""
                 <div style="background-color: {'#2E2E2E' if dark_mode else '#E3F2FD'}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {DARK_TEXT if dark_mode else 'inherit'};">
                 <b>School: {selected_school_name}</b><br>
@@ -834,9 +831,9 @@ if survey_file is not None and metadata_file is not None:
                 """, unsafe_allow_html=True)
 
             # ---------- SIMULATION DEPENDENT ----------
-            # Initialize session state for simulation if not exists
+            # Initialize simulation state
             if 'sim' not in st.session_state:
-                st.session_state.sim = Simulation(num_schools=actual_school_count, random_events=random_events)
+                st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
                 st.session_state.current_month = 0
                 st.session_state.total_months = 0
                 st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
@@ -851,7 +848,7 @@ if survey_file is not None and metadata_file is not None:
 
             # Simulation actions
             if run_btn:
-                st.session_state.sim = Simulation(num_schools=actual_school_count, random_events=random_events)
+                st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
                     agent.real_id = school_ids[idx]
                 for agent in st.session_state.sim.agents:
@@ -903,7 +900,7 @@ if survey_file is not None and metadata_file is not None:
                 st.rerun()
 
             if reset_btn:
-                st.session_state.sim = Simulation(num_schools=actual_school_count, random_events=random_events)
+                st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
                     agent.real_id = school_ids[idx]
                 for agent in st.session_state.sim.agents:
@@ -1007,7 +1004,7 @@ if survey_file is not None and metadata_file is not None:
                     key_R = hist['R'][-1] if hist['R'] else 0
                     key_M = hist['M'][-1] if hist['M'] else 0
 
-                    # Additional insights from school_metrics (now defined)
+                    # Additional insights from school_metrics
                     output_trend_text = ""
                     if school_metrics and school_metrics.get('output_timeline') is not None:
                         tl = school_metrics['output_timeline']
@@ -1115,7 +1112,6 @@ if survey_file is not None and metadata_file is not None:
                     total_research_outputs = len(div_metadata)
                     div_util_rate = (total_utilised / total_research_outputs * 100) if total_research_outputs > 0 else 0
 
-                    # Additional division insights
                     div_insights = div_metrics if 'div_metrics' in locals() else {}
                     top_div_teacher = div_insights.get('top_div_teacher', 'N/A')
                     top_div_school = div_insights.get('top_div_school', 'N/A')
