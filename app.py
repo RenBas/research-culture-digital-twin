@@ -660,7 +660,6 @@ with st.sidebar:
     dark_mode = st.checkbox("🌙 Dark Mode", value=False)
     apply_theme(dark_mode)
 
-    # ---- Policy Levers (Sliders) ----
     col1, col2 = st.columns(2)
     with col1:
         u_train = st.slider("Training freq.", 0.0, 1.0, 0.5, 0.05)
@@ -671,7 +670,6 @@ with st.sidebar:
         u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05)
     levers = {'u_train': u_train, 'u_mentor': u_mentor, 'u_budget': u_budget, 'u_lead': u_lead, 'u_collab': u_collab}
 
-    # ---- Simulation Parameters ----
     max_schools_allowed = 200
     num_schools = st.number_input("Number of schools", min_value=1, max_value=max_schools_allowed, value=20, step=1)
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
@@ -680,7 +678,6 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("#### ⚙️ Simulation Actions")
-    # ---- Simulation Action Buttons ----
     col_buttons = st.columns(3)
     with col_buttons[0]:
         run_btn = st.button("🚀 Run", use_container_width=True)
@@ -689,13 +686,11 @@ with st.sidebar:
     with col_buttons[2]:
         reset_btn = st.button("🔄 Reset", use_container_width=True)
 
-    # ---- Export Data ----
     st.markdown("---")
     st.markdown("#### 📥 Export Data")
     export_btn = st.button("📊 Export results (CSV)", use_container_width=True)
 
     st.markdown("---")
-    # ---- Download Templates ----
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>📄 Download Templates</h3>", unsafe_allow_html=True)
     st.caption("Download blank CSV templates to fill with your data.")
     survey_template = """month,school_id_no,school_name,R,A,C,S,I,P,M
@@ -709,13 +704,14 @@ with st.sidebar:
         st.download_button(label="📄 Metadata Template (CSV)", data=metadata_template, file_name="research_metadata_template.csv", mime="text/csv", use_container_width=True)
 
     st.markdown("---")
-    # ---- Data Upload ----
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>📂 Data Upload</h3>", unsafe_allow_html=True)
     st.caption("Upload your filled CSV files below:")
     survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
     metadata_file = st.file_uploader("Upload research metadata (CSV)", type=["csv"], key="metadata")
 
-# Main area (unchanged from previous version)
+# ------------------------------------------------------------
+# Main area
+# ------------------------------------------------------------
 if survey_file is not None and metadata_file is not None:
     try:
         survey_df = pd.read_csv(survey_file)
@@ -728,11 +724,40 @@ if survey_file is not None and metadata_file is not None:
             st.error(f"Metadata error: {meta_error}")
         else:
             st.success(f"Loaded {len(school_info)} schools.")
+            
+            # ---------- ALWAYS VISIBLE (No simulation needed) ----------
+            school_ids = school_info['school_id_no'].head(num_schools).tolist()
+            school_options = [f"ID {sid}: {school_info[school_info['school_id_no']==sid]['school_name'].values[0]}" for sid in school_ids]
+            selected_school_label = st.selectbox("Select school", school_options, index=0)
+            selected_school_id = int(selected_school_label.split(":")[0].split()[1])
+            selected_school_name = school_info[school_info['school_id_no']==selected_school_id]['school_name'].values[0]
+            
+            st.markdown("### Research Outputs (Recent)")
+            df_show = metadata_df[metadata_df['school_id_no'] == selected_school_id].copy()
+            if not df_show.empty:
+                df_show_sorted = df_show.sort_values('upload_date', ascending=False)
+                st.dataframe(df_show_sorted[['teacher_name', 'year_undertaken', 'title', 'theme', 'status', 'utilized_by_school']].head(10))
+            else:
+                st.info("No research outputs for this school.")
+            
+            # Radar Chart (always visible)
+            latest = get_latest_survey(survey_df, selected_school_id)
+            if latest is not None:
+                latest_dict = latest.to_dict()
+                st.plotly_chart(radar_chart(latest_dict, selected_school_name, dark_mode), use_container_width=True)
+            else:
+                st.info("No survey data for current quarter.")
+            
+            # Research Outputs Dashboard (always visible)
+            with st.expander("📚 Research Outputs Dashboard (for selected school)"):
+                research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name, dark_mode)
+
+            # ---------- SIMULATION DEPENDENT ----------
+            # Initialize session state for simulation if not exists
             if 'sim' not in st.session_state:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 st.session_state.current_month = 0
                 st.session_state.total_months = 0
-                school_ids = school_info['school_id_no'].head(num_schools).tolist()
                 st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
                 for idx, agent in enumerate(st.session_state.sim.agents):
                     agent.real_id = school_ids[idx]
@@ -742,20 +767,8 @@ if survey_file is not None and metadata_file is not None:
                     agent.M = min(1.0, agent.M + len(school_metadata[school_metadata['status']=='published'])*0.02)
                     agent.C = min(1.0, agent.C + len(school_metadata[school_metadata['document_type']=='full_paper'])*0.005)
                     agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
-            school_ids = school_info['school_id_no'].head(num_schools).tolist()
-            school_options = [f"ID {sid}: {school_info[school_info['school_id_no']==sid]['school_name'].values[0]}" for sid in school_ids]
-            selected_school_label = st.selectbox("Select school", school_options, index=0)
-            selected_school_id = int(selected_school_label.split(":")[0].split()[1])
-            selected_school_name = school_info[school_info['school_id_no']==selected_school_id]['school_name'].values[0]
-            st.markdown("### Research Outputs (Recent)")
-            df_show = metadata_df[metadata_df['school_id_no'] == selected_school_id].copy()
-            if not df_show.empty:
-                df_show_sorted = df_show.sort_values('upload_date', ascending=False)
-                st.dataframe(df_show_sorted[['teacher_name', 'year_undertaken', 'title', 'theme', 'status', 'utilized_by_school']].head(10))
-            else:
-                st.info("No research outputs for this school.")
 
-            # Simulation actions (run, step, reset) - same as before
+            # Simulation actions (run, step, reset)
             if run_btn:
                 st.session_state.sim = Simulation(num_schools=num_schools, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
@@ -823,11 +836,12 @@ if survey_file is not None and metadata_file is not None:
                 st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
                 st.rerun()
 
+            # ---------- Simulation-dependent outputs ----------
             if st.session_state.total_months > 0:
                 hist = st.session_state.history.get(selected_school_id, None)
                 agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
                 if hist and agent:
-                    # Main plots
+                    # Main plots (Variable Evolution, Milestone, RCSI, Improvement per Cycle)
                     fig1 = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress", "Research Culture Sustainability Index (RCSI)", "Improvement per Completed Cycle"))
                     colors = ['#1E88E5', USTP_GOLD, '#8E44AD', '#2ECC71', '#E67E22', DEPED_RED, '#1ABC9C']
                     vars_ = ['R','A','C','S','I','P','M']
@@ -853,23 +867,11 @@ if survey_file is not None and metadata_file is not None:
                     fig1.update_yaxes(title_text="RCSI", row=2, col=2)
                     st.plotly_chart(fig1, use_container_width=True)
 
-                    # Radar chart
-                    latest = get_latest_survey(survey_df, selected_school_id)
-                    if latest is not None:
-                        latest_dict = latest.to_dict()
-                        st.plotly_chart(radar_chart(latest_dict, selected_school_name, dark_mode), use_container_width=True)
-                    else:
-                        st.info("No survey data for current quarter.")
-
-                    # Research Outputs Dashboard
-                    with st.expander("📚 Research Outputs Dashboard (for selected school)"):
-                        school_metrics = research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name, dark_mode)
-
                     # Cycle vs Research Outputs
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
 
-                    # Division‑Level Analysis
+                    # Division-Level Analysis
                     with st.expander("🏢 Division‑Level Analysis"):
                         div_metrics = division_level_analysis(survey_df, metadata_df, st.session_state.history, st.session_state.sim.agents, dark_mode)
 
@@ -905,7 +907,6 @@ if survey_file is not None and metadata_file is not None:
                                        6:"Milestone 6 (Impact Realization)"}
                     milestone_name = milestone_names.get(agent.current_milestone, f"Milestone {agent.current_milestone}")
 
-                    # Cycle interpretation
                     if agent.cycle_count >= 2:
                         cycle_text = f"has completed {agent.cycle_count} full cycles, indicating a self‑sustaining research culture where cyclical improvement is institutionalized."
                     elif agent.cycle_count == 1:
@@ -913,7 +914,6 @@ if survey_file is not None and metadata_file is not None:
                     else:
                         cycle_text = "has not yet completed any full cycle, meaning the research culture is still in early formation and has not achieved cyclical momentum."
 
-                    # Milestone interpretation
                     if agent.current_milestone == 0:
                         milestone_progress = "is at the very beginning of the journey."
                     elif agent.current_milestone <= 2:
@@ -926,12 +926,11 @@ if survey_file is not None and metadata_file is not None:
                     key_R = hist['R'][-1] if hist['R'] else 0
                     key_M = hist['M'][-1] if hist['M'] else 0
 
-                    # ---- Additional insights from new graphics ----
+                    # Additional insights from new graphics
                     output_trend_text = ""
                     if school_metrics and school_metrics.get('output_timeline') is not None:
                         tl = school_metrics['output_timeline']
                         if len(tl) >= 2:
-                            # simple trend: compare last two quarters
                             if tl.iloc[-1]['count'] > tl.iloc[-2]['count']:
                                 output_trend_text = "Research output is increasing over time."
                             elif tl.iloc[-1]['count'] < tl.iloc[-2]['count']:
@@ -959,7 +958,6 @@ if survey_file is not None and metadata_file is not None:
                         if school_metrics.get('top_edu_name') != "N/A":
                             top_teacher_text += f"Education: {school_metrics['top_edu_name']}."
 
-                    # Build coherent synopsis
                     coherent_text = f"""
                     After {st.session_state.total_months} months, {selected_school_name} (ID {selected_school_id}) has reached {milestone_name} and {cycle_text} 
                     The school’s Research Culture Sustainability Index (RCSI) is <b>{rcsi_val:.3f}</b>, which falls into the <b>{rcsi_level}</b> level. 
@@ -1036,7 +1034,7 @@ if survey_file is not None and metadata_file is not None:
                     total_research_outputs = len(div_metadata)
                     div_util_rate = (total_utilised / total_research_outputs * 100) if total_research_outputs > 0 else 0
 
-                    # ---- Additional division insights from new metrics ----
+                    # Additional division insights
                     div_insights = div_metrics if 'div_metrics' in locals() else {}
                     top_div_teacher = div_insights.get('top_div_teacher', 'N/A')
                     top_div_school = div_insights.get('top_div_school', 'N/A')
@@ -1046,7 +1044,6 @@ if survey_file is not None and metadata_file is not None:
                     bottleneck_milestone = div_insights.get('bottleneck_milestone', 'N/A')
                     bottleneck_time = div_insights.get('bottleneck_time', 0)
 
-                    # Construct division insight sentences
                     output_trend_div = ""
                     if not metadata_df.empty and 'upload_date' in metadata_df.columns:
                         div_timeline = metadata_df.groupby(metadata_df['upload_date'].dt.to_period('Q')).size()
