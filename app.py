@@ -684,7 +684,7 @@ def generate_baseline_synopsis(survey_row, school_name, metadata_df):
 st.set_page_config(page_title="7-Milestone Research Culture Sustainability Framework", layout="wide")
 st.markdown(f"<h1 style='text-align: center; color: {USTP_DARK_BLUE};'>7‑Milestone Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
 
-# Initialize session state variables for slider
+# Initialize session state variables
 if 'max_schools' not in st.session_state:
     st.session_state.max_schools = 200
 if 'num_schools' not in st.session_state:
@@ -715,7 +715,8 @@ with st.sidebar:
 
     # ---- Simulation Parameters ----
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Simulation Parameters</h3>", unsafe_allow_html=True)
-    num_schools = st.number_input("Number of schools", min_value=1, max_value=st.session_state.max_schools, value=st.session_state.num_schools, step=1, key='num_schools_input')
+    # Remove the number of schools slider; instead show static metric (updated after data upload)
+    st.metric(label="🏫 Total Schools Loaded", value=st.session_state.num_schools, help="Number of schools detected in the uploaded survey data.")
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
     random_events = st.checkbox("Enable random events", value=False)
     use_survey = st.checkbox("Override with survey data", value=True)
@@ -774,9 +775,8 @@ if survey_file is not None and metadata_file is not None:
             st.error(f"Metadata error: {meta_error}")
         else:
             actual_count = len(school_info)
-            # Update session state for slider
-            if st.session_state.max_schools != actual_count or st.session_state.num_schools != actual_count:
-                st.session_state.max_schools = actual_count
+            # Update session state for the static metric
+            if st.session_state.num_schools != actual_count:
                 st.session_state.num_schools = actual_count
                 st.rerun()
 
@@ -816,7 +816,7 @@ if survey_file is not None and metadata_file is not None:
                 if latest_row is not None:
                     baseline_synopsis = generate_baseline_synopsis(latest_row, selected_school_name, metadata_df)
                     st.session_state.baseline_synopsis = baseline_synopsis
-                    st.session_state.baseline_survey_row = latest_row.to_dict()  # store for comparison
+                    st.session_state.baseline_survey_row = latest_row.to_dict()
                 else:
                     st.warning("No survey data available to generate baseline.")
             
@@ -1059,39 +1059,44 @@ if survey_file is not None and metadata_file is not None:
                     </div>
                     """, unsafe_allow_html=True)
 
-                    # ===================== BASELINE vs SIMULATION COMPARISON =====================
+                    # ===================== BASELINE vs SIMULATION COMPARISON (TABLE) =====================
                     if 'baseline_synopsis' in st.session_state and 'baseline_survey_row' in st.session_state:
                         bs = st.session_state.baseline_synopsis
                         baseline_vals = st.session_state.baseline_survey_row
                         gaps = bs['gaps']
                         if gaps:
                             st.markdown("#### 🔍 Baseline vs Simulation Comparison (Critical Gaps)")
-                            comparison_lines = []
+                            # Build table rows
+                            table_data = []
+                            var_names = {
+                                'R': 'Readiness',
+                                'A': 'Awareness',
+                                'C': 'Capacity',
+                                'S': 'Structured Support',
+                                'I': 'Institutional Anchoring',
+                                'P': 'Community of Practice',
+                                'M': 'Impact Realization'
+                            }
                             for var in gaps:
                                 base_val = baseline_vals[var]
                                 sim_val = getattr(agent, var)
                                 diff = sim_val - base_val
                                 if diff > 0.01:
-                                    arrow = "↑ (Improving)"
-                                    status = f"**Improved** from {base_val:.2f} to {sim_val:.2f}"
+                                    status = "↑ Improving"
                                 elif diff < -0.01:
-                                    arrow = "↓ (Regressing)"
-                                    status = f"**Regressed** from {base_val:.2f} to {sim_val:.2f}"
+                                    status = "↓ Regressing"
                                 else:
-                                    arrow = "→ (Stable)"
-                                    status = f"**Stable** at {sim_val:.2f}"
-                                # Map variable to full name
-                                var_names = {
-                                    'R': 'Readiness',
-                                    'A': 'Awareness',
-                                    'C': 'Capacity',
-                                    'S': 'Structured Support',
-                                    'I': 'Institutional Anchoring',
-                                    'P': 'Community of Practice',
-                                    'M': 'Impact Realization'
-                                }
-                                comparison_lines.append(f"- **{var_names[var]} ({var})**: {arrow} – {status}.")
-                            # Add interpretation
+                                    status = "→ Stable"
+                                table_data.append({
+                                    "Critical Gap": f"{var_names[var]} ({var})",
+                                    "Baseline Value": f"{base_val:.2f}",
+                                    "Simulation Value": f"{sim_val:.2f}",
+                                    "Status": status
+                                })
+                            # Convert to DataFrame and display as table
+                            df_compare = pd.DataFrame(table_data)
+                            st.table(df_compare)
+                            # Summary interpretation
                             improving = sum(1 for v in gaps if getattr(agent, v) - baseline_vals[v] > 0.01)
                             regressing = sum(1 for v in gaps if getattr(agent, v) - baseline_vals[v] < -0.01)
                             if improving > regressing:
@@ -1100,14 +1105,7 @@ if survey_file is not None and metadata_file is not None:
                                 summary = "Overall, the simulation indicates that several critical gaps are regressing. Consider adjusting policy levers."
                             else:
                                 summary = "Overall, the simulation shows mixed or stable results for critical gaps. Further analysis may be needed."
-
-                            comparison_text = "\n".join(comparison_lines)
-                            st.markdown(f"""
-                            <div style="background-color: {'#2E2E2E' if dark_mode else '#FFF8E1'}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {DARK_TEXT if dark_mode else 'inherit'};">
-                            {comparison_text}
-                            <br><b>Interpretation:</b> {summary}
-                            </div>
-                            """, unsafe_allow_html=True)
+                            st.markdown(f"**Interpretation:** {summary}")
 
                     # ===================== DIVISION SYNOPSIS =====================
                     total_schools = len(st.session_state.sim.agents)
