@@ -235,7 +235,7 @@ def get_latest_survey(survey_df, school_id):
         return None
     return school_data.sort_values('month_num').iloc[-1]
 
-# ---------- Radar chart ----------
+# ---------- Radar chart with circular arrow ----------
 def radar_chart(survey_row, school_name, dark_mode):
     variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
     value_map = {
@@ -249,6 +249,7 @@ def radar_chart(survey_row, school_name, dark_mode):
     }
     values = [value_map[v] for v in variables]
 
+    # Main radar trace
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(
         r=values,
@@ -259,13 +260,45 @@ def radar_chart(survey_row, school_name, dark_mode):
         fillcolor=f"rgba(245, 166, 35, 0.3)"
     ))
 
+    # ---- Circular arrow (dashed circle + arrowhead) ----
+    # Circle at r=1.02 (just outside max radial axis)
+    circle_r = 1.02
+    n_points = 100
+    angles_deg = np.linspace(0, 360, n_points)
+    fig.add_trace(go.Scatterpolar(
+        r=[circle_r] * n_points,
+        theta=angles_deg,
+        mode='lines',
+        line=dict(color=USTP_DARK_BLUE, width=1.5, dash='dash'),
+        showlegend=False,
+        hoverinfo='skip'
+    ))
+
+    # Arrowhead at angle 0° (top), pointing clockwise (to the right)
+    # We'll create a small triangle: base at r=1.02, tip at r=1.07, angular spread ±4°
+    tip_r = 1.07
+    base_r = 1.02
+    angle_center = 0
+    angle_spread = 4
+    fig.add_trace(go.Scatterpolar(
+        r=[base_r, base_r, tip_r, base_r],
+        theta=[-angle_spread, angle_spread, angle_center, -angle_spread],
+        mode='lines',
+        line=dict(color=USTP_DARK_BLUE, width=1),
+        fill='toself',
+        fillcolor=USTP_DARK_BLUE,
+        showlegend=False,
+        hovertemplate='↻ Milestone cycle direction (clockwise)<extra></extra>'
+    ))
+
+    # Layout
     template = 'plotly_dark' if dark_mode else 'plotly_white'
     fig.update_layout(
         template=template,
         polar=dict(
             radialaxis=dict(
                 visible=True,
-                range=[0, 1.0],
+                range=[0, 1.08],  # slightly above 1 to show arrow
                 tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
                 ticktext=['0', '0.2', '0.4', '0.6', '0.8', '1.0'],
                 color=USTP_GOLD if dark_mode else USTP_DARK_BLUE
@@ -278,24 +311,6 @@ def radar_chart(survey_row, school_name, dark_mode):
         title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
         showlegend=False,
         font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
-        annotations=[
-            dict(
-                text="↻ <b>Milestone cycle direction (clockwise)</b>",
-                xref="paper",
-                yref="paper",
-                x=1.0,
-                y=0.95,
-                xanchor='right',
-                yanchor='top',
-                showarrow=False,
-                font=dict(size=14, color=USTP_GOLD),
-                bgcolor="rgba(0,0,0,0.6)" if dark_mode else "rgba(255,255,255,0.8)",
-                bordercolor=USTP_GOLD,
-                borderwidth=1,
-                borderpad=4,
-                opacity=0.9
-            )
-        ],
         height=500,
         margin=dict(l=60, r=80, t=80, b=60)
     )
@@ -307,6 +322,8 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     if school_meta.empty:
         st.info(f"No research outputs for {school_name}.")
         return None
+
+    st.caption("📝 This dashboard displays all research outputs from the uploaded metadata, independent of simulation duration.")
 
     # Theme Distribution
     theme_counts = school_meta['theme'].value_counts().reset_index()
@@ -596,8 +613,8 @@ def division_level_analysis(survey_df, metadata_df, history_per_school, sim_agen
 
 def school_comparison_dashboard(survey_df, history_per_school, school_info, selected_school_ids, dark_mode):
     st.markdown("### 📊 Comparative School Analysis")
-    if not selected_school_ids:
-        st.info("Select at least one school to compare.")
+    if len(selected_school_ids) < 2:
+        st.info("Please select at least two schools to compare.")
         return
 
     histories = {}
@@ -695,16 +712,13 @@ with st.sidebar:
     dark_mode = st.checkbox("🌙 Dark Mode", value=False)
     apply_theme(dark_mode)
 
-    # ---- Total Schools Loaded (Moved to top) ----
     st.metric(label="🏫 Total Schools Loaded", value=st.session_state.num_schools, help="Number of schools detected in the uploaded survey data.")
 
     st.markdown("---")
-    # ---- Baseline Analysis Section ----
     st.markdown("#### 📊 Baseline Analysis")
     baseline_btn = st.button("🔍 Analyze Baseline", use_container_width=True)
 
     st.markdown("---")
-    # ---- Policy Levers ----
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Policy Levers</h3>", unsafe_allow_html=True)
     col1, col2 = st.columns(2)
     with col1:
@@ -716,14 +730,12 @@ with st.sidebar:
         u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05)
     levers = {'u_train': u_train, 'u_mentor': u_mentor, 'u_budget': u_budget, 'u_lead': u_lead, 'u_collab': u_collab}
 
-    # ---- Simulation Parameters ----
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Simulation Parameters</h3>", unsafe_allow_html=True)
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
     random_events = st.checkbox("Enable random events", value=False)
     use_survey = st.checkbox("Override with survey data", value=True)
 
     st.markdown("---")
-    # ---- Simulation Actions ----
     st.markdown("#### ⚙️ Simulation Actions")
     col_buttons = st.columns(3)
     with col_buttons[0]:
@@ -735,12 +747,10 @@ with st.sidebar:
     st.caption("**Run:** Full forecast for selected duration (resets history). **Step:** Advance one month without resetting (observe gradual changes).")
 
     st.markdown("---")
-    # ---- Export ----
     st.markdown("#### 📥 Export Data")
     export_btn = st.button("📊 Export results (CSV)", use_container_width=True)
 
     st.markdown("---")
-    # ---- Download Templates ----
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>📄 Download Templates</h3>", unsafe_allow_html=True)
     st.caption("Download blank CSV templates to fill with your data.")
     survey_template = """month,school_id_no,school_name,R,A,C,S,I,P,M
@@ -754,7 +764,6 @@ with st.sidebar:
         st.download_button(label="📄 Metadata Template (CSV)", data=metadata_template, file_name="research_metadata_template.csv", mime="text/csv", use_container_width=True)
 
     st.markdown("---")
-    # ---- Data Upload ----
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>📂 Data Upload</h3>", unsafe_allow_html=True)
     st.caption("Upload your filled CSV files below:")
     survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
@@ -788,11 +797,9 @@ if survey_file is not None and metadata_file is not None:
             selected_school_id = int(selected_school_label.split(":")[0].split()[1])
             selected_school_name = school_info[school_info['school_id_no']==selected_school_id]['school_name'].values[0]
             
-            # ---- Centered Header for Baseline ----
             st.markdown("## 📋 Baseline from Uploaded Data")
             st.markdown("---")
             
-            # Research Outputs (Recent)
             st.markdown("### Research Outputs (Recent)")
             df_show = metadata_df[metadata_df['school_id_no'] == selected_school_id].copy()
             if not df_show.empty:
@@ -801,7 +808,7 @@ if survey_file is not None and metadata_file is not None:
             else:
                 st.info("No research outputs for this school.")
             
-            # Radar Chart with Legend (using columns)
+            # Radar Chart with Legend
             latest = get_latest_survey(survey_df, selected_school_id)
             if latest is not None:
                 col_left, col_right = st.columns([1, 3])
@@ -823,7 +830,6 @@ if survey_file is not None and metadata_file is not None:
             else:
                 st.info("No survey data for current quarter.")
             
-            # Research Outputs Dashboard (always visible)
             with st.expander("📚 Research Outputs Dashboard (for selected school)"):
                 school_metrics = research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name, dark_mode)
             
@@ -853,7 +859,6 @@ if survey_file is not None and metadata_file is not None:
                 """, unsafe_allow_html=True)
 
             # ---------- SIMULATION DEPENDENT ----------
-            # Initialize simulation state
             if 'sim' not in st.session_state:
                 st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
                 st.session_state.current_month = 0
@@ -868,7 +873,6 @@ if survey_file is not None and metadata_file is not None:
                     agent.C = min(1.0, agent.C + len(school_metadata[school_metadata['document_type']=='full_paper'])*0.005)
                     agent.P = min(1.0, agent.P + school_metadata['theme'].nunique()*0.01)
 
-            # Simulation actions
             if run_btn:
                 st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
                 for idx, agent in enumerate(st.session_state.sim.agents):
@@ -938,7 +942,6 @@ if survey_file is not None and metadata_file is not None:
 
             # ---------- Simulation-dependent outputs ----------
             if st.session_state.total_months > 0:
-                # ---- Centered Header for Simulated Data ----
                 st.markdown("## ⚙️ Simulated Data")
                 st.markdown("---")
                 
@@ -971,20 +974,22 @@ if survey_file is not None and metadata_file is not None:
                     fig1.update_yaxes(title_text="RCSI", row=2, col=2)
                     st.plotly_chart(fig1, use_container_width=True)
 
-                    # Cycle vs Research Outputs
                     with st.expander("🔄 Cycle vs Research Outputs"):
                         cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
 
-                    # Division-Level Analysis
                     with st.expander("🏢 Division‑Level Analysis"):
                         div_metrics = division_level_analysis(survey_df, metadata_df, st.session_state.history, st.session_state.sim.agents, dark_mode)
 
                     # Comparative School Analysis
                     with st.expander("📊 Comparative School Analysis"):
                         all_schools = school_info['school_id_no'].tolist()
-                        selected_comparison = st.multiselect("Select schools to compare", options=all_schools, default=all_schools[:3] if len(all_schools)>=3 else all_schools, format_func=lambda x: f"ID {x}: {school_info[school_info['school_id_no']==x]['school_name'].values[0]}")
-                        if selected_comparison:
-                            school_comparison_dashboard(survey_df, st.session_state.history, school_info, selected_comparison, dark_mode)
+                        selected_comparison = st.multiselect(
+                            "Select schools to compare (choose at least two)",
+                            options=all_schools,
+                            default=[],  # empty default
+                            format_func=lambda x: f"ID {x}: {school_info[school_info['school_id_no']==x]['school_name'].values[0]}"
+                        )
+                        school_comparison_dashboard(survey_df, st.session_state.history, school_info, selected_comparison, dark_mode)
 
                     # RCSI interpretation table
                     st.markdown("### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
