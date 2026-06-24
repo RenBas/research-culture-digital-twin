@@ -9,7 +9,7 @@ from typing import List, Dict
 import math
 
 # ============================================================
-# USTP + DepEd Colour Palette
+# CDO Division Colour Palette (USTP + DepEd)
 # ============================================================
 USTP_DARK_BLUE = "#0D2B5E"
 USTP_GOLD = "#F5A623"
@@ -235,7 +235,7 @@ def get_latest_survey(survey_df, school_id):
         return None
     return school_data.sort_values('month_num').iloc[-1]
 
-# ---------- Radar chart (original clean version with bottom annotation) ----------
+# ---------- Radar chart (clean version with bottom annotation) ----------
 def radar_chart(survey_row, school_name, dark_mode):
     variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
     value_map = {
@@ -292,11 +292,11 @@ def radar_chart(survey_row, school_name, dark_mode):
             )
         ],
         height=500,
-        margin=dict(l=60, r=80, t=80, b=100)  # increased bottom margin for annotation
+        margin=dict(l=60, r=80, t=80, b=100)
     )
     return fig
 
-# ---------- Research Outputs Dashboard ----------
+# ---------- Research Outputs Dashboard (with new rank & attainment charts) ----------
 def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     if school_meta.empty:
@@ -407,6 +407,48 @@ def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
             st.info("Insufficient data for a meaningful scatter plot (need at least 2 teachers).")
     else:
         st.info("📝 'years_of_service' column not found or all values are missing in metadata. To enable experience vs output analysis, add this column to your CSV file.")
+
+    # ---- NEW: Research Outputs by Teacher Rank ----
+    if 'teacher_rank' in school_meta.columns and not school_meta['teacher_rank'].isna().all():
+        # Group by rank
+        rank_group = school_meta.groupby('teacher_rank').size().reset_index(name='total_outputs')
+        # Compute average outputs per teacher within each rank (we need to count teachers per rank)
+        # We'll compute count of teachers per rank and then average
+        teacher_rank_counts = school_meta.groupby('teacher_rank')['teacher_name'].nunique().reset_index(name='num_teachers')
+        rank_summary = rank_group.merge(teacher_rank_counts, on='teacher_rank')
+        rank_summary['avg_outputs'] = rank_summary['total_outputs'] / rank_summary['num_teachers']
+        # Sort by rank (optional)
+        fig_rank = px.bar(rank_summary, x='teacher_rank', y='total_outputs',
+                          title=f"Research Outputs by Teacher Rank – {school_name}",
+                          labels={'total_outputs': 'Total Outputs', 'teacher_rank': 'Teacher Rank'},
+                          color='total_outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
+        fig_rank.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+        st.plotly_chart(fig_rank, use_container_width=True)
+        # Add caption with average
+        top_rank = rank_summary.loc[rank_summary['total_outputs'].idxmax(), 'teacher_rank'] if not rank_summary.empty else None
+        if top_rank:
+            st.caption(f"📝 The rank with the most outputs is '{top_rank}'. On average, teachers in this rank produce {rank_summary.loc[rank_summary['teacher_rank']==top_rank, 'avg_outputs'].values[0]:.1f} outputs per teacher.")
+    else:
+        st.info("📝 'teacher_rank' column not found or all values are missing. To enable rank analysis, add this column to your CSV file.")
+
+    # ---- NEW: Research Outputs by Educational Attainment ----
+    if 'educational_attainment' in school_meta.columns and not school_meta['educational_attainment'].isna().all():
+        edu_group = school_meta.groupby('educational_attainment').size().reset_index(name='total_outputs')
+        # Compute average outputs per teacher per attainment
+        teacher_edu_counts = school_meta.groupby('educational_attainment')['teacher_name'].nunique().reset_index(name='num_teachers')
+        edu_summary = edu_group.merge(teacher_edu_counts, on='educational_attainment')
+        edu_summary['avg_outputs'] = edu_summary['total_outputs'] / edu_summary['num_teachers']
+        fig_edu = px.bar(edu_summary, x='educational_attainment', y='total_outputs',
+                         title=f"Research Outputs by Educational Attainment – {school_name}",
+                         labels={'total_outputs': 'Total Outputs', 'educational_attainment': 'Educational Attainment'},
+                         color='total_outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
+        fig_edu.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+        st.plotly_chart(fig_edu, use_container_width=True)
+        top_edu = edu_summary.loc[edu_summary['total_outputs'].idxmax(), 'educational_attainment'] if not edu_summary.empty else None
+        if top_edu:
+            st.caption(f"📝 The attainment level with the most outputs is '{top_edu}'. On average, teachers with this attainment produce {edu_summary.loc[edu_summary['educational_attainment']==top_edu, 'avg_outputs'].values[0]:.1f} outputs per teacher.")
+    else:
+        st.info("📝 'educational_attainment' column not found or all values are missing. To enable educational attainment analysis, add this column to your CSV file.")
 
     # Top Teacher by Category
     st.markdown("#### 🏆 Top Teacher by Category")
@@ -678,14 +720,14 @@ def generate_baseline_synopsis(survey_row, school_name, metadata_df):
 # ------------------------------------------------------------
 # Streamlit UI
 # ------------------------------------------------------------
-st.set_page_config(page_title="7-Milestone Research Culture Sustainability Framework", layout="wide")
-st.markdown(f"<h1 style='text-align: center; color: {USTP_DARK_BLUE};'>7‑Milestone Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
+st.set_page_config(page_title="CDO Division Research Culture Sustainability Framework", layout="wide")
+st.markdown("<h1 style='text-align: center; color: #0D2B5E;'>CDO Division Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
 
 # Initialize session state variables
 if 'max_schools' not in st.session_state:
     st.session_state.max_schools = 200
 if 'num_schools' not in st.session_state:
-    st.session_state.num_schools = 20
+    st.session_state.num_schools = 0  # changed from 20 to 0
 
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
@@ -777,7 +819,8 @@ if survey_file is not None and metadata_file is not None:
             selected_school_id = int(selected_school_label.split(":")[0].split()[1])
             selected_school_name = school_info[school_info['school_id_no']==selected_school_id]['school_name'].values[0]
             
-            st.markdown("## 📋 Baseline from Uploaded Data")
+            # Centered header for Baseline
+            st.markdown("<h2 style='text-align: center;'>📋 Baseline from Uploaded Data</h2>", unsafe_allow_html=True)
             st.markdown("---")
             
             st.markdown("### Research Outputs (Recent)")
@@ -788,10 +831,10 @@ if survey_file is not None and metadata_file is not None:
             else:
                 st.info("No research outputs for this school.")
             
-            # Radar Chart with Legend
+            # Radar Chart with Legend (adjusted ratio for smaller legend)
             latest = get_latest_survey(survey_df, selected_school_id)
             if latest is not None:
-                col_left, col_right = st.columns([1, 3])
+                col_left, col_right = st.columns([1, 5])  # smaller left column for legend
                 with col_left:
                     st.markdown("**📌 Legend:**")
                     legend_text = """
@@ -803,7 +846,8 @@ if survey_file is not None and metadata_file is not None:
                     - **P (M5)** → Community of Practice
                     - **M (M6)** → Impact Realization
                     """
-                    st.markdown(legend_text)
+                    # Use smaller font size for legend
+                    st.markdown(f'<div style="font-size: 12px;">{legend_text}</div>', unsafe_allow_html=True)
                 with col_right:
                     latest_dict = latest.to_dict()
                     st.plotly_chart(radar_chart(latest_dict, selected_school_name, dark_mode), use_container_width=True)
@@ -922,7 +966,7 @@ if survey_file is not None and metadata_file is not None:
 
             # ---------- Simulation-dependent outputs ----------
             if st.session_state.total_months > 0:
-                st.markdown("## ⚙️ Simulated Data")
+                st.markdown("<h2 style='text-align: center;'>⚙️ Simulated Data</h2>", unsafe_allow_html=True)
                 st.markdown("---")
                 
                 hist = st.session_state.history.get(selected_school_id, None)
@@ -1228,7 +1272,7 @@ if survey_file is not None and metadata_file is not None:
                         - **Research Culture Sustainability Index (RCSI):** Cumulative strength of the research ecosystem, derived from Impact Realization (M) and Collaboration (P).
                         - **Improvement per Completed Cycle:** Each bar shows the RCSI contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
                         - **Radar Chart:** Current snapshot of the seven milestone‑linked variables – the ideal is a balanced, high‑value shape.
-                        - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, experience vs output, timeline, and top teachers.
+                        - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, experience vs output, timeline, top teachers, and breakdown by rank and attainment.
                         - **Division‑Level Analysis:** Correlation heatmap, milestone transition bottlenecks, and teacher leaderboard.
                         - **Comparative Analysis:** Overlay multiple schools' RCSI and milestone progress.
                         - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
