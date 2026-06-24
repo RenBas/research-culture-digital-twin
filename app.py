@@ -310,7 +310,7 @@ def interpret_utilisation_rate(rate):
     else:
         return "Very High", "Excellent utilisation; research is consistently applied to improve practice."
 
-# ---------- Research Outputs Dashboard (with utilisation rate interpretation) ----------
+# ---------- Research Outputs Dashboard ----------
 def research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     if school_meta.empty:
@@ -586,14 +586,29 @@ def division_level_analysis(survey_df, metadata_df, history_per_school, sim_agen
         merged = survey_agg.merge(output_counts, on=['school_id_no', 'month_num'], how='inner')
         if not merged.empty:
             corr = merged[['R','A','C','S','I','P','M','output_count']].corr()
-            fig_corr = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues', aspect='auto')
+            fig_corr = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues', aspect='auto',
+                                  labels=dict(color="Correlation Coefficient (r)"))
             fig_corr.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
             st.plotly_chart(fig_corr, use_container_width=True)
             corr_vals = corr['output_count'].drop('output_count')
             if not corr_vals.empty:
                 top_corr_var = corr_vals.abs().idxmax()
                 top_corr_val = corr_vals[top_corr_var]
-                st.caption(f"📝 The variable most strongly correlated with research output is '{top_corr_var}' (r = {top_corr_val:.2f}). {'Positive' if top_corr_val>0 else 'Negative'} correlation suggests that {'higher' if top_corr_val>0 else 'lower'} {top_corr_var} is associated with more research outputs.")
+                # Map variable names to full names
+                var_full_names = {
+                    'R': 'Readiness (R)',
+                    'A': 'Awareness (A)',
+                    'C': 'Capacity (C)',
+                    'S': 'Structured Support (S)',
+                    'I': 'Institutional Anchoring (I)',
+                    'P': 'Community of Practice (P)',
+                    'M': 'Impact Realization (M)'
+                }
+                full_var = var_full_names.get(top_corr_var, top_corr_var)
+                direction = "Positive" if top_corr_val > 0 else "Negative"
+                association = "higher" if top_corr_val > 0 else "lower"
+                st.caption(f"📝 The variable most strongly correlated with research output is **{full_var}** (r = {top_corr_val:.2f}). {direction} correlation suggests that **{association} {top_corr_var}** is associated with more research outputs.")
+                st.caption("ℹ️ The heatmap shows correlation (r) based on historical data. It is not a prediction of the simulation. The actual simulated value of a variable is shown in the Variable Evolution plot.")
         else:
             st.info("Insufficient data to compute correlation (need survey and metadata for the same quarters).")
 
@@ -736,7 +751,7 @@ st.markdown("<h1 style='text-align: center; color: #0D2B5E;'>CDO Division Resear
 if 'max_schools' not in st.session_state:
     st.session_state.max_schools = 200
 if 'num_schools' not in st.session_state:
-    st.session_state.num_schools = 0  # default to 0
+    st.session_state.num_schools = 0
 
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
@@ -858,7 +873,6 @@ if survey_file is not None and metadata_file is not None:
                 with col_right:
                     latest_dict = latest.to_dict()
                     st.plotly_chart(radar_chart(latest_dict, selected_school_name, dark_mode), use_container_width=True)
-                    # Radar chart interpretation caption
                     st.caption("📌 The distance from the centre (0) to each milestone point represents the strength of that milestone. A point further from the centre indicates a more advanced research culture component.")
             else:
                 st.info("No survey data for current quarter.")
@@ -882,12 +896,13 @@ if survey_file is not None and metadata_file is not None:
                 st.markdown(f"""
                 <div style="background-color: {'#2E2E2E' if dark_mode else '#E3F2FD'}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {DARK_TEXT if dark_mode else 'inherit'};">
                 <b>School: {selected_school_name}</b><br>
-                <b>Baseline RCSI:</b> {bs['baseline_rcsi']:.3f}<br>
+                <b>Baseline RCSI:</b> {bs['baseline_rcsi']:.3f} <i>(static average of the seven variables for the latest quarter)</i><br>
                 <b>Strengths (≥0.6):</b> {', '.join(bs['strengths']) if bs['strengths'] else 'None'}<br>
                 <b>Critical Gaps (≤0.3):</b> {', '.join(bs['gaps']) if bs['gaps'] else 'None'}<br>
                 <b>Moderate (0.3–0.6):</b> {', '.join(bs['moderate']) if bs['moderate'] else 'None'}<br>
                 <b>Actionable Recommendations:</b><br>
                 {'<br>'.join(bs['recommendations'])}
+                <br><i>ℹ️ The RCSI Interpretation Table below applies to both the baseline RCSI (static) and the simulation RCSI (cumulative). The simulation RCSI will accumulate over time as you run the simulation.</i>
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -1127,13 +1142,13 @@ if survey_file is not None and metadata_file is not None:
                             st.markdown("#### 🔍 Baseline vs Simulation Comparison (Critical Gaps)")
                             table_data = []
                             var_names = {
-                                'R': 'Readiness',
-                                'A': 'Awareness',
-                                'C': 'Capacity',
-                                'S': 'Structured Support',
-                                'I': 'Institutional Anchoring',
-                                'P': 'Community of Practice',
-                                'M': 'Impact Realization'
+                                'R': 'Readiness (R)',
+                                'A': 'Awareness (A)',
+                                'C': 'Capacity (C)',
+                                'S': 'Structured Support (S)',
+                                'I': 'Institutional Anchoring (I)',
+                                'P': 'Community of Practice (P)',
+                                'M': 'Impact Realization (M)'
                             }
                             for var in gaps:
                                 base_val = baseline_vals[var]
@@ -1146,7 +1161,7 @@ if survey_file is not None and metadata_file is not None:
                                 else:
                                     status = "→ Stable"
                                 table_data.append({
-                                    "Critical Gap": f"{var_names[var]} ({var})",
+                                    "Critical Gap": var_names[var],
                                     "Baseline Value": f"{base_val:.2f}",
                                     "Simulation Value": f"{sim_val:.2f}",
                                     "Status": status
@@ -1247,7 +1262,17 @@ if survey_file is not None and metadata_file is not None:
 
                     corr_insight = ""
                     if top_corr_var != "N/A":
-                        corr_insight = f"The heatmap shows that '{top_corr_var}' has the strongest correlation with research output (r = {top_corr_val:.2f}). Investing in {top_corr_var} may yield the highest return."
+                        var_full_names = {
+                            'R': 'Readiness (R)',
+                            'A': 'Awareness (A)',
+                            'C': 'Capacity (C)',
+                            'S': 'Structured Support (S)',
+                            'I': 'Institutional Anchoring (I)',
+                            'P': 'Community of Practice (P)',
+                            'M': 'Impact Realization (M)'
+                        }
+                        full_var = var_full_names.get(top_corr_var, top_corr_var)
+                        corr_insight = f"The heatmap shows that **{full_var}** has the strongest correlation with research output (r = {top_corr_val:.2f}). Investing in {top_corr_var} may yield the highest return."
 
                     bottleneck_insight = ""
                     if bottleneck_milestone != "N/A":
