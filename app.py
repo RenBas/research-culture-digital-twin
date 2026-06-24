@@ -545,7 +545,7 @@ def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     elif len(cumulative_outputs) == 1:
         st.caption("📝 First cycle completed. Continued research output will be needed to build sustainability.")
 
-# ---------- Division-Level Analysis ----------
+# ---------- Division-Level Analysis (without heatmap) ----------
 def division_level_analysis(survey_df, metadata_df, history_per_school, sim_agents, dark_mode):
     st.markdown("### 🔍 Division‑Level Analysis")
 
@@ -574,45 +574,7 @@ def division_level_analysis(survey_df, metadata_df, history_per_school, sim_agen
         top_div_teacher = top_div_school = "N/A"
         top_div_outputs = 0
 
-    # ---- 2. Correlation Heatmap ----
-    st.markdown("#### 📊 Correlation Heatmap: Survey Variables vs Research Output Count")
-    top_corr_var = "N/A"
-    top_corr_val = 0
-    if survey_df is not None and not metadata_df.empty:
-        survey_agg = survey_df.groupby(['school_id_no', 'month_num'])[['R','A','C','S','I','P','M']].mean().reset_index()
-        meta = metadata_df.copy()
-        meta['month_num'] = meta['upload_date'].apply(lambda d: (d.year - 2026)*12 + d.month)
-        output_counts = meta.groupby(['school_id_no', 'month_num']).size().reset_index(name='output_count')
-        merged = survey_agg.merge(output_counts, on=['school_id_no', 'month_num'], how='inner')
-        if not merged.empty:
-            corr = merged[['R','A','C','S','I','P','M','output_count']].corr()
-            fig_corr = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues', aspect='auto',
-                                  labels=dict(color="Correlation Coefficient (r)"))
-            fig_corr.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
-            st.plotly_chart(fig_corr, use_container_width=True)
-            corr_vals = corr['output_count'].drop('output_count')
-            if not corr_vals.empty:
-                top_corr_var = corr_vals.abs().idxmax()
-                top_corr_val = corr_vals[top_corr_var]
-                # Map variable names to full names
-                var_full_names = {
-                    'R': 'Readiness (R)',
-                    'A': 'Awareness (A)',
-                    'C': 'Capacity (C)',
-                    'S': 'Structured Support (S)',
-                    'I': 'Institutional Anchoring (I)',
-                    'P': 'Community of Practice (P)',
-                    'M': 'Impact Realization (M)'
-                }
-                full_var = var_full_names.get(top_corr_var, top_corr_var)
-                direction = "Positive" if top_corr_val > 0 else "Negative"
-                association = "higher" if top_corr_val > 0 else "lower"
-                st.caption(f"📝 The variable most strongly correlated with research output is **{full_var}** (r = {top_corr_val:.2f}). {direction} correlation suggests that **{association} {top_corr_var}** is associated with more research outputs.")
-                st.caption("ℹ️ The heatmap shows correlation (r) based on historical data. It is not a prediction of the simulation. The actual simulated value of a variable is shown in the Variable Evolution plot.")
-        else:
-            st.info("Insufficient data to compute correlation (need survey and metadata for the same quarters).")
-
-    # ---- 3. Milestone Transition Analysis ----
+    # ---- 2. Milestone Transition Analysis (no heatmap) ----
     st.markdown("#### ⏱️ Milestone Transition Analysis (Average Months per Milestone)")
     all_durations = {m: [] for m in range(7)}
     for agent in sim_agents:
@@ -651,8 +613,6 @@ def division_level_analysis(survey_df, metadata_df, history_per_school, sim_agen
         'top_div_teacher': top_div_teacher,
         'top_div_school': top_div_school,
         'top_div_outputs': top_div_outputs,
-        'top_corr_var': top_corr_var,
-        'top_corr_val': top_corr_val,
         'bottleneck_milestone': bottleneck_milestone,
         'bottleneck_time': bottleneck_time
     }
@@ -740,6 +700,32 @@ def generate_baseline_synopsis(survey_row, school_name, metadata_df):
         'recommendations': recommendations,
         'values': values
     }
+
+# ---------- Baseline Heatmap (new) ----------
+def baseline_heatmap(survey_df, metadata_df, dark_mode):
+    st.markdown("### 📊 Historical Correlation Matrix (Diagnostic)")
+    if survey_df is None or metadata_df is None:
+        st.info("Insufficient data to compute correlation (need survey and metadata).")
+        return
+
+    # Aggregate survey data per school per quarter
+    survey_agg = survey_df.groupby(['school_id_no', 'month_num'])[['R','A','C','S','I','P','M']].mean().reset_index()
+    # Count research outputs per school per quarter
+    meta = metadata_df.copy()
+    meta['month_num'] = meta['upload_date'].apply(lambda d: (d.year - 2026)*12 + d.month)
+    output_counts = meta.groupby(['school_id_no', 'month_num']).size().reset_index(name='output_count')
+    # Merge
+    merged = survey_agg.merge(output_counts, on=['school_id_no', 'month_num'], how='inner')
+    if merged.empty:
+        st.info("Insufficient data to compute correlation (need survey and metadata for the same quarters).")
+        return
+
+    corr = merged[['R','A','C','S','I','P','M','output_count']].corr()
+    fig_corr = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues', aspect='auto',
+                         labels=dict(color="Correlation Coefficient (r)"))
+    fig_corr.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+    st.plotly_chart(fig_corr, use_container_width=True)
+    st.caption("📌 This heatmap shows the correlation between the seven variables and research output count in the uploaded historical data. Correlation does not imply causation. Use the simulation (Run/Step) to test the effect of policy levers on these variables over time.")
 
 # ------------------------------------------------------------
 # Streamlit UI
@@ -905,6 +891,9 @@ if survey_file is not None and metadata_file is not None:
                 <br><i>ℹ️ The RCSI Interpretation Table below applies to both the baseline RCSI (static) and the simulation RCSI (cumulative). The simulation RCSI will accumulate over time as you run the simulation.</i>
                 </div>
                 """, unsafe_allow_html=True)
+
+            # ---------- NEW: Baseline Heatmap (Diagnostic) ----------
+            baseline_heatmap(survey_df, metadata_df, dark_mode)
 
             # ---------- SIMULATION DEPENDENT ----------
             if 'sim' not in st.session_state:
@@ -1240,8 +1229,6 @@ if survey_file is not None and metadata_file is not None:
                     top_div_teacher = div_insights.get('top_div_teacher', 'N/A')
                     top_div_school = div_insights.get('top_div_school', 'N/A')
                     top_div_outputs = div_insights.get('top_div_outputs', 0)
-                    top_corr_var = div_insights.get('top_corr_var', 'N/A')
-                    top_corr_val = div_insights.get('top_corr_val', 0)
                     bottleneck_milestone = div_insights.get('bottleneck_milestone', 'N/A')
                     bottleneck_time = div_insights.get('bottleneck_time', 0)
 
@@ -1260,19 +1247,7 @@ if survey_file is not None and metadata_file is not None:
                         else:
                             output_trend_div = "Division output trend data is limited; continued monitoring is recommended."
 
-                    corr_insight = ""
-                    if top_corr_var != "N/A":
-                        var_full_names = {
-                            'R': 'Readiness (R)',
-                            'A': 'Awareness (A)',
-                            'C': 'Capacity (C)',
-                            'S': 'Structured Support (S)',
-                            'I': 'Institutional Anchoring (I)',
-                            'P': 'Community of Practice (P)',
-                            'M': 'Impact Realization (M)'
-                        }
-                        full_var = var_full_names.get(top_corr_var, top_corr_var)
-                        corr_insight = f"The heatmap shows that **{full_var}** has the strongest correlation with research output (r = {top_corr_val:.2f}). Investing in {top_corr_var} may yield the highest return."
+                    corr_insight = ""  # removed
 
                     bottleneck_insight = ""
                     if bottleneck_milestone != "N/A":
@@ -1292,7 +1267,6 @@ if survey_file is not None and metadata_file is not None:
                     • Stage distribution: {early_text} are in early stages (milestone ≤2), {transitional_percent:.1f}% are at milestone 3 (transitional), and {advanced_text} are in advanced stages (milestone ≥4).<br>
                     <i>Division‑wide sustainability assessment:</i> {sustainability_text}<br><br>
                     📊 <b>Productivity:</b> {output_trend_div}<br>
-                    🔍 <b>Key Driver:</b> {corr_insight}<br>
                     ⏱️ <b>Bottleneck:</b> {bottleneck_insight}<br>
                     🏆 <b>Top Division Researcher:</b> {top_teacher_insight}
                     </div>
@@ -1307,7 +1281,7 @@ if survey_file is not None and metadata_file is not None:
                         - **Improvement per Completed Cycle:** Each bar shows the RCSI contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
                         - **Radar Chart:** Current snapshot of the seven milestone‑linked variables – the ideal is a balanced, high‑value shape.
                         - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, experience vs output, timeline, top teachers, and breakdown by rank and attainment.
-                        - **Division‑Level Analysis:** Correlation heatmap, milestone transition bottlenecks, and teacher leaderboard.
+                        - **Division‑Level Analysis:** Milestone transition bottlenecks and teacher leaderboard.
                         - **Comparative Analysis:** Overlay multiple schools' RCSI and milestone progress.
                         - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
                         """)
