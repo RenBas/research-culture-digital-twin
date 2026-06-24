@@ -735,6 +735,8 @@ if 'max_schools' not in st.session_state:
     st.session_state.max_schools = 200
 if 'num_schools' not in st.session_state:
     st.session_state.num_schools = 0
+if 'total_teachers' not in st.session_state:
+    st.session_state.total_teachers = 0
 
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
@@ -742,6 +744,7 @@ with st.sidebar:
     apply_theme(dark_mode)
 
     st.metric(label="🏫 Total Schools Loaded", value=st.session_state.num_schools, help="Number of schools detected in the uploaded survey data.")
+    st.metric(label="🧑‍🏫 Total Teachers Recorded", value=st.session_state.total_teachers, help="Number of unique teachers in the uploaded research metadata.")
 
     st.markdown("---")
     st.markdown("#### 📊 Baseline Analysis")
@@ -817,7 +820,13 @@ if survey_file is not None and metadata_file is not None:
                 st.session_state.num_schools = actual_count
                 st.rerun()
 
-            st.success(f"Loaded {actual_count} schools.")
+            # Compute total teachers
+            total_teachers = metadata_df['teacher_name'].nunique() if metadata_df is not None else 0
+            if st.session_state.total_teachers != total_teachers:
+                st.session_state.total_teachers = total_teachers
+                st.rerun()
+
+            st.success(f"Loaded {actual_count} schools and {total_teachers} teachers.")
             
             # ---------- ALWAYS VISIBLE (BASELINE DATA) ----------
             school_ids = school_info['school_id_no'].tolist()
@@ -868,8 +877,7 @@ if survey_file is not None and metadata_file is not None:
                 latest_row = get_latest_survey(survey_df, selected_school_id)
                 if latest_row is not None:
                     baseline_synopsis = generate_baseline_synopsis(latest_row, selected_school_name, metadata_df)
-                    # Also compute standard deviations for significance later
-                    # We'll compute std dev of each variable across all schools/quarters from survey_df
+                    # Compute standard deviations for significance later
                     if survey_df is not None:
                         std_devs = survey_df[['R','A','C','S','I','P','M']].std()
                         st.session_state.baseline_std_devs = std_devs.to_dict()
@@ -1129,7 +1137,6 @@ if survey_file is not None and metadata_file is not None:
                         bs = st.session_state.baseline_synopsis
                         baseline_vals = st.session_state.baseline_survey_row
                         gaps = bs['gaps']
-                        # Get standard deviations from session state if available
                         std_devs = st.session_state.get('baseline_std_devs', {})
                         if gaps:
                             st.markdown("#### 🔍 Baseline vs Simulation Comparison (Critical Gaps)")
@@ -1153,8 +1160,8 @@ if survey_file is not None and metadata_file is not None:
                                     status = "↓ Regressing"
                                 else:
                                     status = "→ Stable"
-                                # Determine significance using both statistical (std dev) and practical (0.10) thresholds
-                                std_dev = std_devs.get(var, 0.1)  # default if not available
+                                # Determine significance using std dev and practical threshold
+                                std_dev = std_devs.get(var, 0.1)
                                 if abs(diff) >= 0.10:
                                     significance = "Both statistically and practically significant"
                                 elif abs(diff) >= 0.5 * std_dev:
@@ -1180,7 +1187,7 @@ if survey_file is not None and metadata_file is not None:
                                 summary = "Overall, the simulation shows mixed or stable results for critical gaps. Further analysis may be needed."
                             st.markdown(f"**Interpretation:** {summary}")
 
-                    # ===================== DIVISION SYNOPSIS (with spelled out milestones) =====================
+                    # ===================== DIVISION SYNOPSIS (spelled out) =====================
                     total_schools = len(st.session_state.sim.agents)
                     early_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
                     advanced_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
@@ -1260,20 +1267,21 @@ if survey_file is not None and metadata_file is not None:
                         else:
                             output_trend_div = "Division output trend data is limited; continued monitoring is recommended."
 
+                    # Spell out bottleneck milestone
+                    milestone_map_full = {
+                        'M0': 'Milestone 0 (Readiness and Relevance)',
+                        'M1': 'Milestone 1 (Awareness to Action)',
+                        'M2': 'Milestone 2 (Capacity Spark)',
+                        'M3': 'Milestone 3 (Structured Support)',
+                        'M4': 'Milestone 4 (Institutional Anchoring)',
+                        'M5': 'Milestone 5 (Community of Practice)',
+                        'M6': 'Milestone 6 (Impact Realization)'
+                    }
+                    full_bottleneck = milestone_map_full.get(bottleneck_milestone, bottleneck_milestone)
+
                     bottleneck_insight = ""
                     if bottleneck_milestone != "N/A":
-                        # Spell out milestone name
-                        milestone_map_full = {
-                            'M0': 'Milestone 0 (Readiness and Relevance)',
-                            'M1': 'Milestone 1 (Awareness to Action)',
-                            'M2': 'Milestone 2 (Capacity Spark)',
-                            'M3': 'Milestone 3 (Structured Support)',
-                            'M4': 'Milestone 4 (Institutional Anchoring)',
-                            'M5': 'Milestone 5 (Community of Practice)',
-                            'M6': 'Milestone 6 (Impact Realization)'
-                        }
-                        full_name = milestone_map_full.get(bottleneck_milestone, bottleneck_milestone)
-                        bottleneck_insight = f"Schools spend the most time on average in {full_name} ({bottleneck_time:.1f} months). This is the critical bottleneck holding back division‑wide progress."
+                        bottleneck_insight = f"Schools spend the most time on average in {full_bottleneck} ({bottleneck_time:.1f} months). This is the critical bottleneck holding back division‑wide progress."
 
                     top_teacher_insight = ""
                     if top_div_teacher != "N/A":
