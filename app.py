@@ -1959,7 +1959,7 @@ class Simulation:
         return self.agents[idx]
 
 # ------------------------------------------------------------
-# Phase 2 functions (calibration, clustering, sensitivity, MC)
+# Phase 2 functions
 # ------------------------------------------------------------
 def calibrate_coefficients(survey_df):
     if not SKLEARN_AVAILABLE:
@@ -2177,7 +2177,6 @@ def monte_carlo_sim(num_runs, sim_class, agent_params, levers, duration, use_sur
 def plot_monte_carlo_bands(mc_data, dark_mode):
     months = mc_data['months']
     fig = make_subplots(rows=2, cols=1, subplot_titles=("RCSI with Uncertainty", "Milestone with Uncertainty"))
-    # RCSI
     fig.add_trace(go.Scatter(x=months, y=mc_data['rcsi']['p10'], mode='lines', name='P10 RCSI',
                              line=dict(color=USTP_GOLD, dash='dot')), row=1, col=1)
     fig.add_trace(go.Scatter(x=months, y=mc_data['rcsi']['p50'], mode='lines', name='Median RCSI',
@@ -2189,7 +2188,6 @@ def plot_monte_carlo_bands(mc_data, dark_mode):
     fig.add_trace(go.Scatter(x=months, y=mc_data['rcsi']['p90'], fill='tonexty',
                              fillcolor='rgba(245,166,35,0.2)', line=dict(color='rgba(0,0,0,0)'),
                              showlegend=False, hoverinfo='none'), row=1, col=1)
-    # Milestone
     fig.add_trace(go.Scatter(x=months, y=mc_data['milestone']['p10'], mode='lines', name='P10 Milestone',
                              line=dict(color=DEPED_RED, dash='dot')), row=2, col=1)
     fig.add_trace(go.Scatter(x=months, y=mc_data['milestone']['p50'], mode='lines', name='Median Milestone',
@@ -2529,7 +2527,7 @@ if 'total_teachers' not in st.session_state:
     st.session_state.total_teachers = 0
 
 with st.sidebar:
-    dark_mode = st.checkbox("🌙 Dark Mode", value=False, key="dark_mode")
+    dark_mode = st.checkbox("🌙 Dark Mode", value=False, key="dark_mode")   # ← Only one checkbox
     apply_theme(dark_mode)
 
     st.metric("🏫 Total Schools Loaded", st.session_state.num_schools)
@@ -2692,28 +2690,29 @@ if survey_file is not None and metadata_file is not None:
 
         agent_params = get_agent_params(school_ids, survey_df, metadata_df, st.session_state.calibrated_coeff)
 
+        # Helper to seed metadata and assign real_id
+        def init_simulation(sim_obj):
+            # Assign real_id before any metadata seeding
+            for idx, agent in enumerate(sim_obj.agents):
+                agent.real_id = school_ids[idx]
+            for agent in sim_obj.agents:
+                sm = metadata_df[metadata_df['school_id_no'] == agent.real_id]
+                if not sm.empty:
+                    agent.A = min(1.0, agent.A + len(sm[sm['document_type']=='abstract'])*0.01)
+                    agent.M = min(1.0, agent.M + len(sm[sm['status']=='published'])*0.02)
+                    agent.C = min(1.0, agent.C + len(sm[sm['document_type']=='full_paper'])*0.005)
+                    agent.P = min(1.0, agent.P + sm['theme'].nunique()*0.01)
+
         if 'sim' not in st.session_state:
             st.session_state.sim = Simulation(agent_params=agent_params)
-            for agent in st.session_state.sim.agents:
-                sm = metadata_df[metadata_df['school_id_no'] == agent.real_id]
-                agent.A = min(1.0, agent.A + len(sm[sm['document_type']=='abstract'])*0.01)
-                agent.M = min(1.0, agent.M + len(sm[sm['status']=='published'])*0.02)
-                agent.C = min(1.0, agent.C + len(sm[sm['document_type']=='full_paper'])*0.005)
-                agent.P = min(1.0, agent.P + sm['theme'].nunique()*0.01)
+            init_simulation(st.session_state.sim)
             st.session_state.current_month = 0
             st.session_state.total_months = 0
             st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
-            for agent in st.session_state.sim.agents:
-                agent.real_id = school_ids[agent.id]
 
         if run_btn:
             st.session_state.sim = Simulation(agent_params=agent_params)
-            for agent in st.session_state.sim.agents:
-                sm = metadata_df[metadata_df['school_id_no'] == agent.real_id]
-                agent.A = min(1.0, agent.A + len(sm[sm['document_type']=='abstract'])*0.01)
-                agent.M = min(1.0, agent.M + len(sm[sm['status']=='published'])*0.02)
-                agent.C = min(1.0, agent.C + len(sm[sm['document_type']=='full_paper'])*0.005)
-                agent.P = min(1.0, agent.P + sm['theme'].nunique()*0.01)
+            init_simulation(st.session_state.sim)
             st.session_state.current_month = 0
             st.session_state.total_months = 0
             st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
@@ -2762,12 +2761,7 @@ if survey_file is not None and metadata_file is not None:
 
         if reset_btn:
             st.session_state.sim = Simulation(agent_params=agent_params)
-            for agent in st.session_state.sim.agents:
-                sm = metadata_df[metadata_df['school_id_no'] == agent.real_id]
-                agent.A = min(1.0, agent.A + len(sm[sm['document_type']=='abstract'])*0.01)
-                agent.M = min(1.0, agent.M + len(sm[sm['status']=='published'])*0.02)
-                agent.C = min(1.0, agent.C + len(sm[sm['document_type']=='full_paper'])*0.005)
-                agent.P = min(1.0, agent.P + sm['theme'].nunique()*0.01)
+            init_simulation(st.session_state.sim)
             st.session_state.current_month = 0
             st.session_state.total_months = 0
             st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
