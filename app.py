@@ -1736,7 +1736,7 @@ if survey_file is not None and metadata_file is not None:
 else:
     st.info("Please upload quarterly survey and research metadata CSV files to begin.")
 # ============================================================
-# Phase 2 Digital Twin – CDO Research Culture Framework (Clean)
+# Phase 2 Digital Twin – CDO Research Culture Framework (Final)
 # ============================================================
 import streamlit as st
 import pandas as pd
@@ -1768,9 +1768,6 @@ DARK_BG = "#1E1E1E"
 DARK_TEXT = "#FFFFFF"
 LIGHT_TEXT = "#000000"
 
-# ------------------------------------------------------------
-# Dark Mode CSS
-# ------------------------------------------------------------
 def apply_theme(dark_mode):
     if dark_mode:
         st.markdown(f"""
@@ -1943,17 +1940,13 @@ class Simulation:
             self.agents = []
             for i, params in enumerate(agent_params):
                 init_R, init_A, init_C, init_S, init_I, init_P, init_M, coeff = params
-                agent = SchoolAgent(i,
-                                    initial_R=init_R,
-                                    initial_A=init_A,
-                                    initial_C=init_C,
-                                    initial_S=init_S,
-                                    initial_I=init_I,
-                                    initial_P=init_P,
-                                    initial_M=init_M,
-                                    coeff_dict=coeff,
-                                    random_events_enabled=random_events)
-                self.agents.append(agent)
+                self.agents.append(SchoolAgent(i,
+                                               initial_R=init_R, initial_A=init_A,
+                                               initial_C=init_C, initial_S=init_S,
+                                               initial_I=init_I, initial_P=init_P,
+                                               initial_M=init_M,
+                                               coeff_dict=coeff,
+                                               random_events_enabled=random_events))
         else:
             self.agents = [SchoolAgent(i, random_events_enabled=random_events) for i in range(num_schools)]
 
@@ -1966,13 +1959,13 @@ class Simulation:
         return self.agents[idx]
 
 # ------------------------------------------------------------
-# Phase 2: Calibration, Clustering, Sensitivity, Monte Carlo
+# Phase 2 functions (calibration, clustering, sensitivity, MC)
 # ------------------------------------------------------------
 def calibrate_coefficients(survey_df):
     if not SKLEARN_AVAILABLE:
-        return None, "scikit‑learn not installed. Using default coefficients."
+        return None, "scikit‑learn not installed."
     if survey_df is None or survey_df.empty:
-        return None, "No survey data for calibration."
+        return None, "No survey data."
     u_train = u_mentor = u_budget = u_lead = u_collab = 0.5
     X_R, y_R = [], []
     X_A, y_A = [], []
@@ -2524,15 +2517,6 @@ def school_comparison_dashboard(survey_df, history_per_school, school_info, sele
     fig.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
     st.plotly_chart(fig, use_container_width=True)
 
-def interpret_avg_milestone(avg_milestone):
-    if avg_milestone < 0.5: return f"{avg_milestone:.1f} → between M0 and M1"
-    elif avg_milestone < 1.5: return f"{avg_milestone:.1f} → between M1 and M2"
-    elif avg_milestone < 2.5: return f"{avg_milestone:.1f} → between M2 and M3"
-    elif avg_milestone < 3.5: return f"{avg_milestone:.1f} → between M3 and M4"
-    elif avg_milestone < 4.5: return f"{avg_milestone:.1f} → between M4 and M5"
-    elif avg_milestone < 5.5: return f"{avg_milestone:.1f} → between M5 and M6"
-    else: return f"{avg_milestone:.1f} → at or beyond M6"
-
 # ------------------------------------------------------------
 # Streamlit UI
 # ------------------------------------------------------------
@@ -2613,9 +2597,6 @@ with st.expander("📂 Step 1: Upload your CSV files", expanded=True):
     with c2:
         st.download_button("📄 Metadata Template", metadata_template, "metadata_template.csv", "text/csv", key="meta_dl")
 
-# ------------------------------------------------------------
-# Main processing
-# ------------------------------------------------------------
 if survey_file is not None and metadata_file is not None:
     survey_df_raw = pd.read_csv(survey_file)
     metadata_df_raw = pd.read_csv(metadata_file)
@@ -2699,7 +2680,6 @@ if survey_file is not None and metadata_file is not None:
 
         baseline_heatmap(survey_df, metadata_df, dark_mode)
 
-        # Calibration & agent params
         if 'calibrated_coeff' not in st.session_state:
             with st.spinner("Calibrating model coefficients..."):
                 coeff, calib_msg = calibrate_coefficients(survey_df)
@@ -2793,7 +2773,6 @@ if survey_file is not None and metadata_file is not None:
             st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
             st.rerun()
 
-        # Display simulation results
         if st.session_state.total_months > 0:
             st.markdown("<h2 style='text-align: center;'>⚙️ Simulated Data</h2>", unsafe_allow_html=True)
             st.markdown("---")
@@ -2829,14 +2808,12 @@ if survey_file is not None and metadata_file is not None:
                                                          key="comp_selector")
                     school_comparison_dashboard(survey_df, st.session_state.history, school_info, selected_comparison, dark_mode)
 
-                # Phase 2: Sensitivity Analysis
                 with st.expander("🎯 Sensitivity Analysis (Tornado)"):
                     with st.spinner("Computing sensitivity..."):
                         fig_tornado = run_sensitivity(Simulation, agent_params, levers, duration, use_survey, survey_df, metadata_df, selected_school_id)
                         st.plotly_chart(fig_tornado, use_container_width=True)
                         st.caption("Each lever varied ±10% while others fixed at current slider values.")
 
-                # Phase 2: Monte Carlo bands
                 if 'mc_data' in st.session_state:
                     with st.expander("🎲 Monte Carlo Uncertainty Bands"):
                         mc_data = st.session_state.mc_data
@@ -2853,7 +2830,6 @@ if survey_file is not None and metadata_file is not None:
                             else:
                                 st.info("Not enough Monte Carlo runs for causal analysis (need >10).")
 
-                # RCSI Table & Synopsis
                 st.markdown("### 📈 RCSI Interpretation Table")
                 st.markdown("""
                 | RCSI Range | Level | Description |
@@ -2872,7 +2848,6 @@ if survey_file is not None and metadata_file is not None:
                         break
                 st.markdown(f"**Current RCSI:** {rcsi_val:.3f} → {rcsi_level}")
 
-            # Export
             if export_btn:
                 all_data = []
                 for agent in st.session_state.sim.agents:
