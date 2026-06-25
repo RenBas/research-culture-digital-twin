@@ -745,18 +745,46 @@ def generate_baseline_synopsis(survey_row, school_name, _metadata_df):
 
 def baseline_heatmap(survey_df, metadata_df, dark_mode):
     st.markdown("### Historical Correlation Matrix (Diagnostic)")
-    if survey_df is None or metadata_df is None: st.info("Insufficient data."); return
+    if survey_df is None or metadata_df is None:
+        st.info("Insufficient data.")
+        return
     survey_agg = survey_df.groupby(['school_id_no', 'month_num'])[VARIABLES].mean().reset_index()
-    meta = metadata_df.copy(); meta['month_num'] = meta['upload_date'].apply(date_to_month_num)
+    meta = metadata_df.copy()
+    meta['month_num'] = meta['upload_date'].apply(date_to_month_num)
     output_counts = meta.groupby(['school_id_no', 'month_num']).size().reset_index(name='output_count')
     merged = survey_agg.merge(output_counts, on=['school_id_no', 'month_num'], how='inner')
-    if merged.empty: st.info("Insufficient data."); return
+    if merged.empty:
+        st.info("Insufficient data.")
+        return
     corr = merged[VARIABLES + ['output_count']].corr()
-    fig = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues')
-    fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
-    st.plotly_chart(fig, use_container_width=True)
-    st.caption("Correlation between the seven variables and research output count in historical data.")
+    fig_corr = px.imshow(
+        corr, text_auto=True, title="Correlation Matrix",
+        color_continuous_scale='Blues', aspect='auto',
+        labels=dict(color="Correlation Coefficient (r)"),
+        height=500   # ← larger
+    )
+    fig_corr.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+    st.plotly_chart(fig_corr, use_container_width=True)
 
+    # Compute and store correlation insight for later use in synopsis
+    if 'output_count' in corr.columns:
+        top_corr = corr['output_count'].drop('output_count').abs().sort_values(ascending=False)
+        top_vars_str = ", ".join([f"{v} (r={top_corr[v]:.2f})" for v in top_corr.index[:3]])
+        st.caption(
+            f"The three variables most correlated with research output are: {top_vars_str}. "
+            "These align with the model's logic that Impact (M) and Collaboration (P) drive sustainability."
+        )
+        # Store the strongest variable name (original sign may be negative; we can note it)
+        strongest_var = top_corr.index[0]
+        strongest_r = corr['output_count'][strongest_var]
+        direction = "positive" if strongest_r > 0 else "negative"
+        st.session_state.correlation_insight = (
+            f"Historical data indicates that **{strongest_var}** has the strongest correlation "
+            f"(r = {strongest_r:.2f}) with research output. Strengthening {VAR_FULL_NAMES.get(strongest_var, strongest_var)} "
+            f"may accelerate the school's sustainability progress."
+        )
+    else:
+        st.session_state.correlation_insight = ""
 def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     if not agent.cycle_improvements: st.info("No cycles completed."); return
     sm = metadata_df[metadata_df['school_id_no'] == school_id].copy()
@@ -1115,6 +1143,15 @@ if survey_file is not None and metadata_file is not None:
 
                 sens_text = sensitivity_info if sensitivity_info else ""
                 mc_text = st.session_state.get('mc_info', "")
+                corr_insight = st.session_state.get('correlation_insight', "")
+                synopsis = f"""
+                After {st.session_state.total_months} months, {selected_school_name} … 
+                …
+               {sens_text}
+               {mc_text}
+               {corr_insight}
+               Overall, the school is on a path toward research culture sustainability…
+               """
 
                 bg_col = '#2E2E2E' if dark_mode else '#E3F2FD'
                 synopsis = f"""
