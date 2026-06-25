@@ -1082,14 +1082,14 @@ if survey_file is not None and metadata_file is not None:
                 template = 'plotly_dark' if dark_mode else 'plotly_white'
                 fig1.update_layout(height=800, showlegend=True, font=dict(color=text_col), template=template)
 
-                fig1.update_xaxes(title_text="Month", row=1, col=1, titlefont=dict(color=text_col, size=14))
-                fig1.update_yaxes(title_text="Value (0-1)", row=1, col=1, titlefont=dict(color=text_col, size=14))
-                fig1.update_xaxes(title_text="Month", row=1, col=2, titlefont=dict(color=text_col, size=14))
-                fig1.update_yaxes(title_text="Milestone", row=1, col=2, titlefont=dict(color=text_col, size=14))
-                fig1.update_xaxes(title_text="Month", row=2, col=1, titlefont=dict(color=text_col, size=14))
-                fig1.update_yaxes(title_text="RCSI", row=2, col=1, titlefont=dict(color=text_col, size=14))
-                fig1.update_xaxes(title_text="Cycle Number", row=2, col=2, titlefont=dict(color=text_col, size=14))
-                fig1.update_yaxes(title_text="RCSI", row=2, col=2, titlefont=dict(color=text_col, size=14))
+                fig1.update_xaxes(title_text="Month", row=1, col=1, title_font=dict(color=text_col, size=14))
+                fig1.update_yaxes(title_text="Value (0-1)", row=1, col=1, title_font=dict(color=text_col, size=14))
+                fig1.update_xaxes(title_text="Month", row=1, col=2, title_font=dict(color=text_col, size=14))
+                fig1.update_yaxes(title_text="Milestone", row=1, col=2, title_font=dict(color=text_col, size=14))
+                fig1.update_xaxes(title_text="Month", row=2, col=1, title_font=dict(color=text_col, size=14))
+                fig1.update_yaxes(title_text="RCSI", row=2, col=1, title_font=dict(color=text_col, size=14))
+                fig1.update_xaxes(title_text="Cycle Number", row=2, col=2, title_font=dict(color=text_col, size=14))
+                fig1.update_yaxes(title_text="RCSI", row=2, col=2, title_font=dict(color=text_col, size=14))
 
                 st.plotly_chart(fig1, use_container_width=True)
                 get_figure_download_link(fig1, "simulation_overview.html", "Download Simulation Charts")
