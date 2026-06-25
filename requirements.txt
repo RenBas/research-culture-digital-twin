@@ -4,3 +4,4 @@ numpy
 plotly
 networkx
 kaleido
+scikit-learn
