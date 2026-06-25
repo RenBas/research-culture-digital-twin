@@ -224,14 +224,15 @@ class SchoolAgent:
 class Simulation:
     def __init__(self, num_schools=1, random_events=False, agent_params=None):
         if agent_params:
+            # Now this unpacks correctly: (R,A,C,S,I,P,M,coeff_dict) maps exactly to
+            # initial_R … initial_M, coeff_dict, and random_events_enabled is a keyword
             self.agents = [SchoolAgent(i, *params, random_events_enabled=random_events) for i, params in enumerate(agent_params)]
         else:
             self.agents = [SchoolAgent(i, random_events_enabled=random_events) for i in range(num_schools)]
 
     def step(self, levers, month):
-        for agent in self.agents:
-            agent.model_time = month
-            agent.step_individual(levers)
+        # ... keep your existing code ...
+        pass
 
     def get_agent(self, idx=0):
         return self.agents[idx]
