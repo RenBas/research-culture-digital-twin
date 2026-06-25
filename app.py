@@ -971,17 +971,17 @@ if survey_file is not None and metadata_file is not None:
             baseline_rcsi_val = bs['baseline_rcsi']
             baseline_rcsi_level = classify_rcsi(baseline_rcsi_val)
 
-st.markdown(f"""
-<div style="background-color: {bg_color}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
-<b>School: {selected_school_name}</b><br>
-<b>Baseline RCSI:</b> {baseline_rcsi_val:.3f} → <b>{baseline_rcsi_level}</b> level<br>
-<b>Strengths (≥0.6):</b> {', '.join(bs['strengths']) if bs['strengths'] else 'None'}<br>
-<b>Critical Gaps (≤0.3):</b> {', '.join(bs['gaps']) if bs['gaps'] else 'None'}<br>
-<b>Moderate (0.3–0.6):</b> {', '.join(bs['moderate']) if bs['moderate'] else 'None'}<br>
-<b>Actionable Recommendations:</b><br>
-{'<br>'.join(bs['recommendations'])}
-</div>
-""", unsafe_allow_html=True)
+            st.markdown(f"""
+            <div style="background-color: {bg_color}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
+            <b>School: {selected_school_name}</b><br>
+            <b>Baseline RCSI:</b> {baseline_rcsi_val:.3f} → <b>{baseline_rcsi_level}</b> level<br>
+            <b>Strengths (≥0.6):</b> {', '.join(bs['strengths']) if bs['strengths'] else 'None'}<br>
+            <b>Critical Gaps (≤0.3):</b> {', '.join(bs['gaps']) if bs['gaps'] else 'None'}<br>
+            <b>Moderate (0.3–0.6):</b> {', '.join(bs['moderate']) if bs['moderate'] else 'None'}<br>
+            <b>Actionable Recommendations:</b><br>
+            {'<br>'.join(bs['recommendations'])}
+            </div>
+            """, unsafe_allow_html=True)
         baseline_heatmap(survey_df, metadata_df, dark_mode)
 
         # Phase 2: Calibration & Agent Params
