@@ -418,6 +418,25 @@ def build_radar_chart(survey_values_tuple, school_name, dark_mode):
         fillcolor=f"rgba(245, 166, 35, 0.3)",
         hovertemplate='<b>%{theta}</b><br>Score: %{r:.3f}<extra></extra>'
     ))
+
+    # --- Add a clockwise arrowhead at the outer edge (r=1.0, theta=0°) ---
+    # Triangle vertices:
+    #   tip:   (r=1.00, theta=0°)   → points right (clockwise tangent)
+    #   base1: (r=0.94, theta=8°)   → slightly clockwise from tip
+    #   base2: (r=0.94, theta=-8°)  → slightly anticlockwise (i.e. 352°)
+    arrow_r = [1.00, 0.94, 0.94, 1.00]               # close the triangle
+    arrow_theta = [0, 8, -8, 0]                       # in degrees, Plotly treats negative as anticlockwise from 0
+    fig.add_trace(go.Scatterpolar(
+        r=arrow_r,
+        theta=arrow_theta,
+        mode='lines',
+        fill='toself',
+        line=dict(color=USTP_GOLD, width=1),
+        fillcolor=USTP_GOLD,
+        showlegend=False,
+        hoverinfo='none'
+    ))
+
     template = 'plotly_dark' if dark_mode else 'plotly_white'
     fig.update_layout(
         template=template,
@@ -442,8 +461,6 @@ def build_radar_chart(survey_values_tuple, school_name, dark_mode):
         ],
         height=500, margin=dict(l=60, r=80, t=80, b=100)
     )
-    # Add the explicit clockwise arrow that wraps around the radar
-    add_circular_arrow(fig)
     return fig
 
 # ---------- Helper for utilisation rate interpretation ----------
