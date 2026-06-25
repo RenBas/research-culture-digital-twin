@@ -1736,7 +1736,7 @@ if survey_file is not None and metadata_file is not None:
 else:
     st.info("Please upload quarterly survey and research metadata CSV files to begin.")
 # ============================================================
-# Phase 2 Enhanced Digital Twin – CDO Research Culture Framework
+# Phase 2 Digital Twin – CDO Research Culture Framework (Final)
 # ============================================================
 import streamlit as st
 import pandas as pd
@@ -1745,7 +1745,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from plotly.subplots import make_subplots
 from dataclasses import dataclass
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Tuple
 import math
 import base64
 
@@ -1816,14 +1816,14 @@ def apply_theme(dark_mode):
         </style>
         """, unsafe_allow_html=True)
 
-def get_figure_download_link(fig, filename="chart.html", link_text="Download chart (interactive HTML)"):
+def get_figure_download_link(fig, filename="chart.html", link_text="Download chart"):
     html_str = fig.to_html(include_plotlyjs='cdn', full_html=True)
     b64 = base64.b64encode(html_str.encode()).decode()
     href = f'<a href="data:text/html;base64,{b64}" download="{filename}">{link_text}</a>'
     st.markdown(href, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# Data classes
+# Data classes – SchoolAgent, CycleRecord, Simulation
 # ------------------------------------------------------------
 @dataclass
 class CycleRecord:
@@ -1835,7 +1835,7 @@ class SchoolAgent:
     def __init__(self, unique_id,
                  initial_R=0.3, initial_A=0.2, initial_C=0.2,
                  initial_S=0.1, initial_I=0.1, initial_P=0.1, initial_M=0.0,
-                 coeff_dict=None,                # ← Must be before random_events_enabled
+                 coeff_dict=None,                     # ← BEFORE random_events_enabled
                  random_events_enabled=False):
         self.id = unique_id
         self.R = initial_R
@@ -1944,7 +1944,7 @@ class Simulation:
         if agent_params:
             self.agents = []
             for i, params in enumerate(agent_params):
-                # Unpack explicitly to avoid ordering errors
+                # Explicit unpacking – no ambiguity
                 init_R, init_A, init_C, init_S, init_I, init_P, init_M, coeff = params
                 agent = SchoolAgent(i,
                                     initial_R=init_R,
@@ -1969,13 +1969,13 @@ class Simulation:
         return self.agents[idx]
 
 # ------------------------------------------------------------
-# Phase 2: Calibration
+# Phase 2 – Calibration, Clustering, Sensitivity, Monte Carlo
 # ------------------------------------------------------------
 def calibrate_coefficients(survey_df):
     if not SKLEARN_AVAILABLE:
-        return None, "scikit-learn not installed. Using default coefficients."
+        return None, "scikit‑learn not installed. Using default coefficients."
     if survey_df is None or survey_df.empty:
-        return None, "No survey data for calibration. Using defaults."
+        return None, "No survey data for calibration."
     u_train = u_mentor = u_budget = u_lead = u_collab = 0.5
     X_R, y_R = [], []
     X_A, y_A = [], []
@@ -2050,15 +2050,10 @@ def calibrate_coefficients(survey_df):
                 coeff[k] = v
         return coeff, "Calibration successful."
     except Exception as e:
-        return None, f"Calibration failed: {str(e)}. Using default coefficients."
+        return None, f"Calibration failed: {str(e)}"
 
-# ------------------------------------------------------------
-# Phase 2: Clustering for heterogeneity
-# ------------------------------------------------------------
 def cluster_schools(metadata_df, school_ids):
-    if not SKLEARN_AVAILABLE:
-        return {sid: 0 for sid in school_ids}, {0: 1.0}
-    if metadata_df is None or metadata_df.empty:
+    if not SKLEARN_AVAILABLE or metadata_df is None or metadata_df.empty:
         return {sid: 0 for sid in school_ids}, {0: 1.0}
     features = []
     for sid in school_ids:
@@ -2100,74 +2095,53 @@ def get_agent_params(school_ids, survey_df, metadata_df, calibrated_coeff=None):
         params.append((*init_vals, coeff))
     return params
 
-# ------------------------------------------------------------
-# Phase 2: Sensitivity analysis (tornado)
-# ------------------------------------------------------------
 def run_sensitivity(sim_class, agent_params, levers, duration, use_survey, survey_df, metadata_df, selected_school_id):
     baseline = levers.copy()
     lever_names = ['u_train', 'u_mentor', 'u_budget', 'u_lead', 'u_collab']
-    # baseline run
-    sim_base = sim_class(agent_params=agent_params)
-    for agent in sim_base.agents:
-        sm = metadata_df[metadata_df['school_id_no'] == agent.real_id]
-        if not sm.empty:
-            agent.A = min(1.0, agent.A + len(sm[sm['document_type']=='abstract'])*0.01)
-            agent.M = min(1.0, agent.M + len(sm[sm['status']=='published'])*0.02)
-            agent.C = min(1.0, agent.C + len(sm[sm['document_type']=='full_paper'])*0.005)
-            agent.P = min(1.0, agent.P + sm['theme'].nunique()*0.01)
-    for m in range(1, duration+1):
-        if use_survey:
-            for agent in sim_base.agents:
-                row = survey_df[(survey_df['school_id_no'] == agent.real_id) & (survey_df['month_num'] == m)]
-                if not row.empty:
-                    r = row.iloc[0]
-                    agent.R, agent.A, agent.C, agent.S, agent.I, agent.P, agent.M = r[['R','A','C','S','I','P','M']]
-        sim_base.step(baseline, m)
-    agent_base = next(a for a in sim_base.agents if a.real_id == selected_school_id)
-    base_rcsi = agent_base.running_total_outcome
+    def _quick_run(test_levers):
+        sim = sim_class(agent_params=agent_params)
+        for agent in sim.agents:
+            sm = metadata_df[metadata_df['school_id_no'] == agent.real_id]
+            if not sm.empty:
+                agent.A = min(1.0, agent.A + len(sm[sm['document_type']=='abstract'])*0.01)
+                agent.M = min(1.0, agent.M + len(sm[sm['status']=='published'])*0.02)
+                agent.C = min(1.0, agent.C + len(sm[sm['document_type']=='full_paper'])*0.005)
+                agent.P = min(1.0, agent.P + sm['theme'].nunique()*0.01)
+        for m in range(1, duration+1):
+            if use_survey:
+                for agent in sim.agents:
+                    row = survey_df[(survey_df['school_id_no'] == agent.real_id) & (survey_df['month_num'] == m)]
+                    if not row.empty:
+                        r = row.iloc[0]
+                        agent.R, agent.A, agent.C, agent.S, agent.I, agent.P, agent.M = r[['R','A','C','S','I','P','M']]
+            sim.step(test_levers, m)
+        agent = next(a for a in sim.agents if a.real_id == selected_school_id)
+        return agent.running_total_outcome
+
+    base_rcsi = _quick_run(baseline)
     results = {}
     for lever in lever_names:
         for delta in [-0.1, 0.1]:
             test_levers = baseline.copy()
             test_levers[lever] = max(0.0, min(1.0, baseline[lever] + delta))
-            sim = sim_class(agent_params=agent_params)
-            for agent in sim.agents:
-                sm = metadata_df[metadata_df['school_id_no'] == agent.real_id]
-                if not sm.empty:
-                    agent.A = min(1.0, agent.A + len(sm[sm['document_type']=='abstract'])*0.01)
-                    agent.M = min(1.0, agent.M + len(sm[sm['status']=='published'])*0.02)
-                    agent.C = min(1.0, agent.C + len(sm[sm['document_type']=='full_paper'])*0.005)
-                    agent.P = min(1.0, agent.P + sm['theme'].nunique()*0.01)
-            for m in range(1, duration+1):
-                if use_survey:
-                    for agent in sim.agents:
-                        row = survey_df[(survey_df['school_id_no'] == agent.real_id) & (survey_df['month_num'] == m)]
-                        if not row.empty:
-                            r = row.iloc[0]
-                            agent.R, agent.A, agent.C, agent.S, agent.I, agent.P, agent.M = r[['R','A','C','S','I','P','M']]
-                sim.step(test_levers, m)
-            agent = next(a for a in sim.agents if a.real_id == selected_school_id)
-            results[(lever, delta)] = agent.running_total_outcome
+            results[(lever, delta)] = _quick_run(test_levers)
+
     tornado_data = []
     for lever in lever_names:
         low_change = results[(lever, -0.1)] - base_rcsi
         high_change = results[(lever, 0.1)] - base_rcsi
         tornado_data.append({'Lever': lever, 'Low Change': low_change, 'High Change': high_change})
-    df = pd.DataFrame(tornado_data)
-    df_melt = df.melt(id_vars='Lever', var_name='Direction', value_name='Change')
-    fig = px.bar(df_melt, x='Change', y='Lever', color='Direction', orientation='h',
+    df = pd.DataFrame(tornado_data).melt(id_vars='Lever', var_name='Direction', value_name='Change')
+    fig = px.bar(df, x='Change', y='Lever', color='Direction', orientation='h',
                  title='Sensitivity of Final RCSI to Policy Levers (±10%)',
                  color_discrete_map={'Low Change': DEPED_RED, 'High Change': USTP_GOLD})
     fig.update_layout(template='plotly_white')
     return fig
 
-# ------------------------------------------------------------
-# Phase 2: Monte Carlo with time‑series extraction
-# ------------------------------------------------------------
 def monte_carlo_sim(num_runs, sim_class, agent_params, levers, duration, use_survey, survey_df, metadata_df, selected_school_id):
     all_rcsi = []
     all_milestone = []
-    for run in range(num_runs):
+    for _ in range(num_runs):
         noisy_params = []
         for params in agent_params:
             *init_vals, coeff = params
@@ -2182,9 +2156,8 @@ def monte_carlo_sim(num_runs, sim_class, agent_params, levers, duration, use_sur
                 agent.M = min(1.0, agent.M + len(sm[sm['status']=='published'])*0.02)
                 agent.C = min(1.0, agent.C + len(sm[sm['document_type']=='full_paper'])*0.005)
                 agent.P = min(1.0, agent.P + sm['theme'].nunique()*0.01)
-        target_agent = next(a for a in sim.agents if a.real_id == selected_school_id)
-        rcsi_history = []
-        mil_history = []
+        target = next(a for a in sim.agents if a.real_id == selected_school_id)
+        rcsi_hist, mil_hist = [], []
         for m in range(1, duration+1):
             if use_survey:
                 for agent in sim.agents:
@@ -2193,25 +2166,22 @@ def monte_carlo_sim(num_runs, sim_class, agent_params, levers, duration, use_sur
                         r = row.iloc[0]
                         agent.R, agent.A, agent.C, agent.S, agent.I, agent.P, agent.M = r[['R','A','C','S','I','P','M']]
             sim.step(levers, m)
-            rcsi_history.append(target_agent.running_total_outcome)
-            mil_history.append(target_agent.current_milestone)
-        all_rcsi.append(rcsi_history)
-        all_milestone.append(mil_history)
+            rcsi_hist.append(target.running_total_outcome)
+            mil_hist.append(target.current_milestone)
+        all_rcsi.append(rcsi_hist)
+        all_milestone.append(mil_hist)
     all_rcsi = np.array(all_rcsi)
     all_milestone = np.array(all_milestone)
     months = np.arange(1, duration+1)
-    p10_rcsi = np.percentile(all_rcsi, 10, axis=0)
-    p50_rcsi = np.percentile(all_rcsi, 50, axis=0)
-    p90_rcsi = np.percentile(all_rcsi, 90, axis=0)
-    p10_mil = np.percentile(all_milestone, 10, axis=0)
-    p50_mil = np.percentile(all_milestone, 50, axis=0)
-    p90_mil = np.percentile(all_milestone, 90, axis=0)
-    final_rcsi = all_rcsi[:, -1]
     return {
         'months': months,
-        'rcsi': {'p10': p10_rcsi, 'p50': p50_rcsi, 'p90': p90_rcsi},
-        'milestone': {'p10': p10_mil, 'p50': p50_mil, 'p90': p90_mil},
-        'final_rcsi': final_rcsi
+        'rcsi': {'p10': np.percentile(all_rcsi, 10, axis=0),
+                 'p50': np.percentile(all_rcsi, 50, axis=0),
+                 'p90': np.percentile(all_rcsi, 90, axis=0)},
+        'milestone': {'p10': np.percentile(all_milestone, 10, axis=0),
+                      'p50': np.percentile(all_milestone, 50, axis=0),
+                      'p90': np.percentile(all_milestone, 90, axis=0)},
+        'final_rcsi': all_rcsi[:, -1]
     }
 
 def plot_monte_carlo_bands(mc_data, dark_mode):
@@ -2227,8 +2197,8 @@ def plot_monte_carlo_bands(mc_data, dark_mode):
     fig.add_trace(go.Scatter(x=months, y=mc_data['rcsi']['p10'], showlegend=False,
                              line=dict(color='rgba(0,0,0,0)'), hoverinfo='none'), row=1, col=1)
     fig.add_trace(go.Scatter(x=months, y=mc_data['rcsi']['p90'], fill='tonexty',
-                             fillcolor=f'rgba({int(245)},{int(166)},{int(35)},0.2)',
-                             line=dict(color='rgba(0,0,0,0)'), showlegend=False, hoverinfo='none'), row=1, col=1)
+                             fillcolor='rgba(245,166,35,0.2)', line=dict(color='rgba(0,0,0,0)'),
+                             showlegend=False, hoverinfo='none'), row=1, col=1)
     # Milestone
     fig.add_trace(go.Scatter(x=months, y=mc_data['milestone']['p10'], mode='lines', name='P10 Milestone',
                              line=dict(color=DEPED_RED, dash='dot')), row=2, col=1)
@@ -2239,8 +2209,8 @@ def plot_monte_carlo_bands(mc_data, dark_mode):
     fig.add_trace(go.Scatter(x=months, y=mc_data['milestone']['p10'], showlegend=False,
                              line=dict(color='rgba(0,0,0,0)'), hoverinfo='none'), row=2, col=1)
     fig.add_trace(go.Scatter(x=months, y=mc_data['milestone']['p90'], fill='tonexty',
-                             fillcolor=f'rgba({int(211)},{int(47)},{int(47)},0.2)',
-                             line=dict(color='rgba(0,0,0,0)'), showlegend=False, hoverinfo='none'), row=2, col=1)
+                             fillcolor='rgba(211,47,47,0.2)', line=dict(color='rgba(0,0,0,0)'),
+                             showlegend=False, hoverinfo='none'), row=2, col=1)
     fig.update_layout(height=700, template='plotly_dark' if dark_mode else 'plotly_white')
     fig.update_xaxes(title_text="Month", row=1, col=1)
     fig.update_yaxes(title_text="RCSI", row=1, col=1)
@@ -2248,16 +2218,12 @@ def plot_monte_carlo_bands(mc_data, dark_mode):
     fig.update_yaxes(title_text="Milestone", row=2, col=1)
     return fig
 
-# ------------------------------------------------------------
-# Phase 2: Causal analysis from baseline variables to final RCSI
-# ------------------------------------------------------------
 def causal_analysis(monte_carlo_finals, baseline_values):
     if not SKLEARN_AVAILABLE or len(monte_carlo_finals) < 10:
         return None
     X = np.array([list(baseline_values.values()) for _ in range(len(monte_carlo_finals))])
     model = LinearRegression().fit(X, monte_carlo_finals)
-    coef_dict = {name: coef for name, coef in zip(baseline_values.keys(), model.coef_)}
-    return coef_dict
+    return dict(zip(baseline_values.keys(), model.coef_))
 
 # ------------------------------------------------------------
 # Data processing (unchanged from Phase 1)
@@ -2277,45 +2243,36 @@ def process_survey(_survey_df):
         return None, None, "No survey file uploaded."
     try:
         df = _survey_df.copy()
-        missing_req = [col for col in REQUIRED_SURVEY_COLS if col not in df.columns]
-        if missing_req:
-            return None, None, f"Missing required survey columns: {', '.join(missing_req)}"
+        missing = [c for c in REQUIRED_SURVEY_COLS if c not in df.columns]
+        if missing:
+            return None, None, f"Missing columns: {', '.join(missing)}"
         if 'school_id_no' in df.columns:
             df['school_id_no'] = df['school_id_no'].astype(int)
         else:
             if 'school_id' in df.columns:
                 df['school_id_no'] = df['school_id'].astype(str).apply(lambda x: int(x.split('_')[-1]) if '_' in str(x) else int(x))
             else:
-                return None, None, "Survey file must contain 'school_id_no' or 'school_id' column."
+                return None, None, "Need 'school_id_no' or 'school_id'."
         if 'school_name' not in df.columns:
             df['school_name'] = df['school_id_no'].apply(lambda x: f"School_{x}")
         else:
             df['school_name'] = df['school_name'].fillna(df['school_id_no'].apply(lambda x: f"School_{x}"))
-        def month_str_to_num(month_str):
+        def month_str_to_num(ms):
             try:
-                parts = str(month_str).strip().split('-')
-                if len(parts) == 2:
-                    year, month = int(parts[0]), int(parts[1])
-                    return (year - 2026) * 12 + month
-                else:
-                    return 0
+                y, m = map(int, str(ms).split('-'))
+                return (y - 2026)*12 + m
             except:
                 return 0
         df['month_num'] = df['month'].apply(month_str_to_num)
         for v in ['R','A','C','S','I','P','M']:
             if not pd.api.types.is_numeric_dtype(df[v]):
-                try:
-                    df[v] = pd.to_numeric(df[v], errors='coerce')
-                except:
-                    return None, None, f"Column {v} must be numeric."
-            if df[v].isna().any():
-                return None, None, f"Column {v} contains missing values."
-            if (df[v] < 0).any() or (df[v] > 1).any():
-                return None, None, f"Column {v} values must be between 0 and 1."
+                df[v] = pd.to_numeric(df[v], errors='coerce')
+            if df[v].isna().any() or (df[v] < 0).any() or (df[v] > 1).any():
+                return None, None, f"Column {v} must be numeric between 0 and 1."
         school_info = df[['school_id_no', 'school_name']].drop_duplicates().sort_values('school_id_no')
         return df, school_info, None
     except Exception as e:
-        return None, None, f"Error processing survey: {str(e)}"
+        return None, None, f"Survey error: {str(e)}"
 
 @st.cache_data(show_spinner="Processing metadata...")
 def process_metadata(_metadata_df):
@@ -2323,79 +2280,64 @@ def process_metadata(_metadata_df):
         return None, "No metadata file uploaded."
     try:
         df = _metadata_df.copy()
-        missing_req = [col for col in REQUIRED_META_COLS if col not in df.columns]
-        if missing_req:
-            return None, f"Missing required metadata columns: {', '.join(missing_req)}"
+        missing = [c for c in REQUIRED_META_COLS if c not in df.columns]
+        if missing:
+            return None, f"Missing columns: {', '.join(missing)}"
         if 'school_id_no' not in df.columns:
             if 'school' in df.columns:
                 df['school_id_no'] = df['school'].astype(str).apply(lambda x: int(x.split('_')[-1]) if '_' in str(x) else int(x))
             else:
-                return None, "Metadata must have 'school_id_no' or 'school' column."
+                return None, "Need 'school_id_no' or 'school'."
         df['school_id_no'] = df['school_id_no'].astype(int)
         for col, default in OPTIONAL_META_COLS.items():
             if col not in df.columns:
                 df[col] = default
             else:
                 df[col] = df[col].fillna(default)
-        try:
-            df['upload_date'] = pd.to_datetime(df['upload_date'], errors='coerce')
-            if df['upload_date'].isna().any():
-                return None, "Invalid dates in 'upload_date' column."
-        except:
-            return None, "Could not parse 'upload_date' as datetime."
+        df['upload_date'] = pd.to_datetime(df['upload_date'], errors='coerce')
+        if df['upload_date'].isna().any():
+            return None, "Invalid dates in upload_date."
         if df['utilized_by_school'].dtype != bool:
             df['utilized_by_school'] = df['utilized_by_school'].astype(str).str.lower().map(
-                {'true': True, '1': True, 'yes': True, 'false': False, '0': False, 'no': False}
-            ).fillna(False)
+                {'true': True, '1': True, 'yes': True, 'false': False, '0': False, 'no': False}).fillna(False)
         return df, None
     except Exception as e:
-        return None, f"Error processing metadata: {str(e)}"
+        return None, f"Metadata error: {str(e)}"
 
 def get_latest_survey(survey_df, school_id):
-    school_data = survey_df[survey_df['school_id_no'] == school_id]
-    if school_data.empty:
+    sdf = survey_df[survey_df['school_id_no'] == school_id]
+    if sdf.empty:
         return None
-    return school_data.sort_values('month_num').iloc[-1]
+    return sdf.sort_values('month_num').iloc[-1]
 
-# Radar chart without arrow
 @st.cache_data(show_spinner=False)
 def build_radar_chart(survey_values_tuple, school_name, dark_mode):
     variables = ['R (M0)', 'A (M1)', 'C (M2)', 'S (M3)', 'I (M4)', 'P (M5)', 'M (M6)']
     values = list(survey_values_tuple)
     fig = go.Figure()
     fig.add_trace(go.Scatterpolar(
-        r=values,
-        theta=variables,
-        fill='toself',
-        name=school_name,
-        line_color=USTP_GOLD,
-        fillcolor=f"rgba(245, 166, 35, 0.3)",
+        r=values, theta=variables, fill='toself', name=school_name,
+        line_color=USTP_GOLD, fillcolor='rgba(245,166,35,0.3)',
         hovertemplate='<b>%{theta}</b><br>Score: %{r:.3f}<extra></extra>'
     ))
     template = 'plotly_dark' if dark_mode else 'plotly_white'
     fig.update_layout(
         template=template,
         polar=dict(
-            radialaxis=dict(
-                visible=True, range=[0, 1.0],
-                tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
-                ticktext=['0', '0.2', '0.4', '0.6', '0.8', '1.0'],
-                color=USTP_GOLD if dark_mode else USTP_DARK_BLUE
-            ),
-            angularaxis=dict(direction="clockwise",
-                             tickfont=dict(size=11, color=USTP_GOLD if dark_mode else USTP_DARK_BLUE))
+            radialaxis=dict(visible=True, range=[0,1.0], tickvals=[0,0.2,0.4,0.6,0.8,1.0],
+                            color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
+            angularaxis=dict(direction="clockwise", tickfont=dict(size=11, color=USTP_GOLD if dark_mode else USTP_DARK_BLUE))
         ),
         title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
-        showlegend=False,
-        font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
+        showlegend=False, font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
         height=500, margin=dict(l=60, r=80, t=80, b=100)
     )
     return fig
 
 def interpret_utilisation_rate(rate):
-    if rate < 20: return "Very Low", "Research is rarely adopted into practice."
+    if rate < 20: return "Very Low", "Rarely adopted."
     elif rate < 40: return "Low", "Limited adoption."
-    elif rate < 60: return "Moderate", "Half of outputs adopted."
+    elif rate < 60: return "Moderate", "Half adopted."
     elif rate < 80: return "High", "Strong translation."
     else: return "Very High", "Excellent utilisation."
 
@@ -2405,109 +2347,107 @@ def compute_research_outputs_dashboard(metadata_df, school_id, school_name, dark
     results = {'figs': {}, 'metrics': {}}
     if school_meta.empty:
         return results
-    theme_counts = school_meta['theme'].value_counts().reset_index()
-    theme_counts.columns = ['Theme', 'Count']
-    fig_theme = px.bar(theme_counts, x='Theme', y='Count', title=f"Theme Distribution – {school_name}",
-                       color='Theme', color_discrete_sequence=[USTP_GOLD, DEPED_RED, USTP_DARK_BLUE])
-    fig_theme.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
-    results['figs']['theme_distribution'] = fig_theme
-    results['metrics']['top_theme'] = theme_counts.iloc[0]['Theme'] if not theme_counts.empty else "N/A"
+    # Theme Distribution
+    tc = school_meta['theme'].value_counts().reset_index()
+    tc.columns = ['Theme', 'Count']
+    fig = px.bar(tc, x='Theme', y='Count', title=f"Theme Distribution – {school_name}",
+                 color='Theme', color_discrete_sequence=[USTP_GOLD, DEPED_RED, USTP_DARK_BLUE])
+    fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+    results['figs']['theme_distribution'] = fig
+    results['metrics']['top_theme'] = tc.iloc[0]['Theme'] if not tc.empty else "N/A"
+    # Theme Utilisation
     if 'utilized_by_school' in school_meta.columns:
-        theme_util = school_meta.groupby('theme')['utilized_by_school'].mean().reset_index()
-        theme_util.columns = ['Theme', 'Utilisation Rate']
-        fig_theme_util = px.bar(theme_util, x='Theme', y='Utilisation Rate',
-                                title=f"Theme Utilisation Rate – {school_name}",
-                                color='Utilisation Rate', color_continuous_scale=['#F5A623', '#0D2B5E'])
-        fig_theme_util.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
-        results['figs']['theme_utilisation'] = fig_theme_util
-        results['metrics']['theme_util_df'] = theme_util
-    status_counts = school_meta['status'].value_counts().reset_index()
-    status_counts.columns = ['Status', 'Count']
-    fig_status = px.bar(status_counts, x='Status', y='Count', title=f"Publication Status – {school_name}",
-                        color='Status', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_MAROON])
-    fig_status.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
-    results['figs']['publication_status'] = fig_status
-    published = status_counts[status_counts['Status']=='published']['Count'].sum() if not status_counts.empty else 0
-    total = status_counts['Count'].sum() if not status_counts.empty else 0
-    pub_rate = (published/total*100) if total>0 else 0
-    results['metrics']['pub_rate'] = pub_rate
+        tu = school_meta.groupby('theme')['utilized_by_school'].mean().reset_index()
+        tu.columns = ['Theme', 'Utilisation Rate']
+        fig = px.bar(tu, x='Theme', y='Utilisation Rate', title=f"Theme Utilisation Rate – {school_name}",
+                     color='Utilisation Rate', color_continuous_scale=['#F5A623','#0D2B5E'])
+        fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+        results['figs']['theme_utilisation'] = fig
+        results['metrics']['theme_util_df'] = tu
+    # Publication Status
+    sc = school_meta['status'].value_counts().reset_index()
+    sc.columns = ['Status', 'Count']
+    fig = px.bar(sc, x='Status', y='Count', title=f"Publication Status – {school_name}",
+                 color='Status', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_MAROON])
+    fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+    results['figs']['publication_status'] = fig
+    published = sc[sc['Status']=='published']['Count'].sum() if not sc.empty else 0
+    total = sc['Count'].sum() if not sc.empty else 0
+    results['metrics']['pub_rate'] = (published/total*100) if total>0 else 0
+    # Output Timeline
     if 'upload_date' in school_meta.columns:
-        school_meta_copy = school_meta.copy()
-        school_meta_copy['quarter'] = school_meta_copy['upload_date'].dt.to_period('Q').astype(str)
-        output_timeline = school_meta_copy.groupby('quarter').size().reset_index(name='count')
-        if not output_timeline.empty:
-            fig_timeline = px.line(output_timeline, x='quarter', y='count', title=f"Research Output Timeline – {school_name}",
-                                   markers=True)
-            fig_timeline.update_layout(template='plotly_dark' if dark_mode else 'plotly_white',
-                                       xaxis_title='Quarter', yaxis_title='Number of Outputs')
-            results['figs']['output_timeline'] = fig_timeline
-            results['metrics']['output_timeline'] = output_timeline
+        sm = school_meta.copy()
+        sm['quarter'] = sm['upload_date'].dt.to_period('Q').astype(str)
+        ot = sm.groupby('quarter').size().reset_index(name='count')
+        if not ot.empty:
+            fig = px.line(ot, x='quarter', y='count', title=f"Research Output Timeline – {school_name}", markers=True)
+            fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+            results['figs']['output_timeline'] = fig
+            results['metrics']['output_timeline'] = ot
+    # Utilisation Over Time
     if 'upload_date' in school_meta.columns and 'utilized_by_school' in school_meta.columns:
-        util_timeline = school_meta_copy.groupby('quarter')['utilized_by_school'].mean().reset_index()
-        util_timeline.columns = ['quarter', 'utilisation_rate']
-        if not util_timeline.empty:
-            fig_util_time = px.line(util_timeline, x='quarter', y='utilisation_rate',
-                                    title=f"Utilisation Rate Over Time – {school_name}", markers=True)
-            fig_util_time.update_layout(template='plotly_dark' if dark_mode else 'plotly_white',
-                                        xaxis_title='Quarter', yaxis_title='Utilisation Rate')
-            results['figs']['util_timeline'] = fig_util_time
+        ut = sm.groupby('quarter')['utilized_by_school'].mean().reset_index()
+        ut.columns = ['quarter', 'utilisation_rate']
+        if not ut.empty:
+            fig = px.line(ut, x='quarter', y='utilisation_rate', title=f"Utilisation Rate Over Time – {school_name}", markers=True)
+            fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+            results['figs']['util_timeline'] = fig
+    # School‑level utilisation
     utilised = school_meta['utilized_by_school'].sum() if 'utilized_by_school' in school_meta.columns else 0
     total = len(school_meta)
-    util_rate = (utilised / total * 100) if total > 0 else 0
-    level, desc = interpret_utilisation_rate(util_rate)
-    results['metrics']['util_rate'] = util_rate
-    results['metrics']['util_level'] = level
-    results['metrics']['util_desc'] = desc
-    teacher_counts = school_meta['teacher_name'].value_counts().reset_index().head(10)
-    teacher_counts.columns = ['Teacher', 'Number of Outputs']
-    fig_teacher = px.bar(teacher_counts, x='Number of Outputs', y='Teacher', orientation='h',
-                         title=f"Teacher Productivity (Top 10) – {school_name}",
-                         color='Number of Outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
-    fig_teacher.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
-    results['figs']['teacher_productivity'] = fig_teacher
-    results['metrics']['top_teacher'] = teacher_counts.iloc[0]['Teacher'] if not teacher_counts.empty else "N/A"
+    rate = (utilised/total*100) if total>0 else 0
+    level, desc = interpret_utilisation_rate(rate)
+    results['metrics'].update({'util_rate': rate, 'util_level': level, 'util_desc': desc})
+    # Teacher Productivity
+    tc2 = school_meta['teacher_name'].value_counts().reset_index().head(10)
+    tc2.columns = ['Teacher', 'Number of Outputs']
+    fig = px.bar(tc2, x='Number of Outputs', y='Teacher', orientation='h',
+                 title=f"Teacher Productivity (Top 10) – {school_name}",
+                 color='Number of Outputs', color_continuous_scale=['#F5A623','#0D2B5E'])
+    fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+    results['figs']['teacher_productivity'] = fig
+    results['metrics']['top_teacher'] = tc2.iloc[0]['Teacher'] if not tc2.empty else "N/A"
+    # Years of Service vs Output
     if 'years_of_service' in school_meta.columns and not school_meta['years_of_service'].isna().all():
-        teacher_summary = school_meta.groupby('teacher_name').agg(
-            output_count=('document_type', 'count'), years_of_service=('years_of_service', 'first')
-        ).reset_index().dropna()
-        if len(teacher_summary) > 1:
-            x = teacher_summary['years_of_service']
-            y = teacher_summary['output_count']
+        ts = school_meta.groupby('teacher_name').agg(
+            output_count=('document_type','count'), years_of_service=('years_of_service','first')
+        ).dropna()
+        if len(ts) > 1:
+            x, y = ts['years_of_service'], ts['output_count']
             z = np.polyfit(x, y, 1)
             p = np.poly1d(z)
             trend_x = np.linspace(x.min(), x.max(), 100)
             trend_y = p(trend_x)
-            fig_service = go.Figure()
-            fig_service.add_trace(go.Scatter(x=x, y=y, mode='markers',
-                                             marker=dict(size=12, color=USTP_GOLD),
-                                             text=teacher_summary['teacher_name'], hoverinfo='text+x+y', name='Teachers'))
-            fig_service.add_trace(go.Scatter(x=trend_x, y=trend_y, mode='lines',
-                                             line=dict(color=USTP_DARK_BLUE, width=2, dash='dash'), name='Trend'))
-            fig_service.update_layout(template='plotly_dark' if dark_mode else 'plotly_white',
-                                      title=f"Years of Service vs Research Outputs – {school_name}",
-                                      xaxis_title="Years of Service", yaxis_title="Number of Research Outputs",
-                                      showlegend=True, height=400)
-            results['figs']['service_vs_output'] = fig_service
+            fig = go.Figure()
+            fig.add_trace(go.Scatter(x=x, y=y, mode='markers', marker=dict(size=12, color=USTP_GOLD),
+                                     text=ts.index, hoverinfo='text+x+y', name='Teachers'))
+            fig.add_trace(go.Scatter(x=trend_x, y=trend_y, mode='lines',
+                                     line=dict(color=USTP_DARK_BLUE, width=2, dash='dash'), name='Trend'))
+            fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white',
+                              title=f"Years of Service vs Research Outputs – {school_name}",
+                              xaxis_title="Years of Service", yaxis_title="Number of Outputs", showlegend=True, height=400)
+            results['figs']['service_vs_output'] = fig
+    # Teacher Rank
     if 'teacher_rank' in school_meta.columns and not school_meta['teacher_rank'].isna().all():
-        rank_group = school_meta.groupby('teacher_rank').size().reset_index(name='total_outputs')
-        teacher_rank_counts = school_meta.groupby('teacher_rank')['teacher_name'].nunique().reset_index(name='num_teachers')
-        rank_summary = rank_group.merge(teacher_rank_counts, on='teacher_rank')
-        rank_summary['avg_outputs'] = rank_summary['total_outputs'] / rank_summary['num_teachers']
-        fig_rank = px.bar(rank_summary, x='teacher_rank', y='total_outputs',
-                          title=f"Research Outputs by Teacher Rank – {school_name}",
-                          color='total_outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
-        fig_rank.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
-        results['figs']['rank_breakdown'] = fig_rank
+        rg = school_meta.groupby('teacher_rank').size().reset_index(name='total_outputs')
+        rn = school_meta.groupby('teacher_rank')['teacher_name'].nunique().reset_index(name='num_teachers')
+        rs = rg.merge(rn, on='teacher_rank')
+        rs['avg_outputs'] = rs['total_outputs'] / rs['num_teachers']
+        fig = px.bar(rs, x='teacher_rank', y='total_outputs', title=f"Research Outputs by Teacher Rank – {school_name}",
+                     color='total_outputs', color_continuous_scale=['#F5A623','#0D2B5E'])
+        fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+        results['figs']['rank_breakdown'] = fig
+    # Educational Attainment
     if 'educational_attainment' in school_meta.columns and not school_meta['educational_attainment'].isna().all():
-        edu_group = school_meta.groupby('educational_attainment').size().reset_index(name='total_outputs')
-        teacher_edu_counts = school_meta.groupby('educational_attainment')['teacher_name'].nunique().reset_index(name='num_teachers')
-        edu_summary = edu_group.merge(teacher_edu_counts, on='educational_attainment')
-        edu_summary['avg_outputs'] = edu_summary['total_outputs'] / edu_summary['num_teachers']
-        fig_edu = px.bar(edu_summary, x='educational_attainment', y='total_outputs',
-                         title=f"Research Outputs by Educational Attainment – {school_name}",
-                         color='total_outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
-        fig_edu.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
-        results['figs']['edu_breakdown'] = fig_edu
+        eg = school_meta.groupby('educational_attainment').size().reset_index(name='total_outputs')
+        en = school_meta.groupby('educational_attainment')['teacher_name'].nunique().reset_index(name='num_teachers')
+        es = eg.merge(en, on='educational_attainment')
+        es['avg_outputs'] = es['total_outputs'] / es['num_teachers']
+        fig = px.bar(es, x='educational_attainment', y='total_outputs',
+                     title=f"Research Outputs by Educational Attainment – {school_name}",
+                     color='total_outputs', color_continuous_scale=['#F5A623','#0D2B5E'])
+        fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+        results['figs']['edu_breakdown'] = fig
     return results
 
 def generate_baseline_synopsis(survey_row, school_name, metadata_df):
@@ -2516,48 +2456,44 @@ def generate_baseline_synopsis(survey_row, school_name, metadata_df):
     strengths = [v for v in variables if values[v] >= 0.6]
     gaps = [v for v in variables if values[v] <= 0.3]
     moderate = [v for v in variables if 0.3 < values[v] < 0.6]
-    baseline_rcsi = np.mean([values[v] for v in variables])
-    recommendations = []
-    if 'C' in gaps: recommendations.append("🔹 **Priority 1: Build Teacher Capacity (C).**")
-    if 'S' in gaps: recommendations.append("🔹 **Priority 2: Improve Structured Support (S).**")
-    if 'I' in gaps: recommendations.append("🔹 **Priority 3: Institutional Anchoring (I).**")
-    if 'P' in gaps: recommendations.append("🔹 **Priority 4: Strengthen Community of Practice (P).**")
-    if 'M' in gaps: recommendations.append("🔹 **Priority 5: Enhance Impact Realization (M).**")
-    if not recommendations: recommendations.append("✅ All variables are at moderate or high levels.")
-    return {'strengths': strengths, 'gaps': gaps, 'moderate': moderate, 'baseline_rcsi': baseline_rcsi,
-            'recommendations': recommendations, 'values': values}
+    baseline_rcsi = np.mean(list(values.values()))
+    recs = []
+    if 'C' in gaps: recs.append("🔹 Priority 1: Build Teacher Capacity (C).")
+    if 'S' in gaps: recs.append("🔹 Priority 2: Improve Structured Support (S).")
+    if 'I' in gaps: recs.append("🔹 Priority 3: Institutional Anchoring (I).")
+    if 'P' in gaps: recs.append("🔹 Priority 4: Strengthen Community of Practice (P).")
+    if 'M' in gaps: recs.append("🔹 Priority 5: Enhance Impact Realization (M).")
+    if not recs: recs.append("✅ All variables are at moderate or high levels.")
+    return {'strengths': strengths, 'gaps': gaps, 'moderate': moderate,
+            'baseline_rcsi': baseline_rcsi, 'recommendations': recs, 'values': values}
 
 def baseline_heatmap(survey_df, metadata_df, dark_mode):
     st.markdown("### 📊 Historical Correlation Matrix (Diagnostic)")
     if survey_df is None or metadata_df is None:
         st.info("Insufficient data.")
         return
-    survey_agg = survey_df.groupby(['school_id_no', 'month_num'])[['R','A','C','S','I','P','M']].mean().reset_index()
+    sa = survey_df.groupby(['school_id_no','month_num'])[['R','A','C','S','I','P','M']].mean().reset_index()
     meta = metadata_df.copy()
-    meta['month_num'] = meta['upload_date'].apply(lambda d: (d.year - 2026)*12 + d.month)
-    output_counts = meta.groupby(['school_id_no', 'month_num']).size().reset_index(name='output_count')
-    merged = survey_agg.merge(output_counts, on=['school_id_no', 'month_num'], how='inner')
+    meta['month_num'] = meta['upload_date'].apply(lambda d: (d.year-2026)*12 + d.month)
+    oc = meta.groupby(['school_id_no','month_num']).size().reset_index(name='output_count')
+    merged = sa.merge(oc, on=['school_id_no','month_num'], how='inner')
     if merged.empty:
         st.info("Insufficient data.")
         return
     corr = merged[['R','A','C','S','I','P','M','output_count']].corr()
-    fig_corr = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues')
-    fig_corr.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
-    st.plotly_chart(fig_corr, use_container_width=True)
+    fig = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues')
+    fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+    st.plotly_chart(fig, use_container_width=True)
 
 def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     if not agent.cycle_improvements:
         st.info("No cycles completed.")
         return
-    school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
-    def date_to_month_num(d):
-        return (d.year - 2026)*12 + d.month
-    school_meta['month_num'] = school_meta['upload_date'].apply(date_to_month_num)
-    cumulative_outputs = []
-    for rec in agent.cycle_improvements:
-        cumulative_outputs.append(len(school_meta[school_meta['month_num'] <= rec.completion_month]))
+    sm = metadata_df[metadata_df['school_id_no'] == school_id].copy()
+    sm['month_num'] = sm['upload_date'].apply(lambda d: (d.year-2026)*12 + d.month)
+    cumulative = [len(sm[sm['month_num'] <= rec.completion_month]) for rec in agent.cycle_improvements]
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=[c.cycle_number for c in agent.cycle_improvements], y=cumulative_outputs,
+    fig.add_trace(go.Scatter(x=[c.cycle_number for c in agent.cycle_improvements], y=cumulative,
                              mode='markers+lines', marker=dict(size=10, color=USTP_GOLD),
                              line=dict(color=USTP_DARK_BLUE)))
     fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white',
@@ -2567,13 +2503,12 @@ def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
 def division_level_analysis(survey_df, metadata_df, history_per_school, sim_agents, dark_mode):
     st.markdown("### 🔍 Division‑Level Analysis")
     if not metadata_df.empty:
-        teacher_summary = metadata_df.groupby(['teacher_name', 'school_id_no']).size().reset_index(name='total_outputs')
-        school_names = survey_df[['school_id_no', 'school_name']].drop_duplicates()
-        teacher_summary = teacher_summary.merge(school_names, on='school_id_no', how='left')
-        teacher_summary = teacher_summary.sort_values('total_outputs', ascending=False).head(20)
-        st.dataframe(teacher_summary[['teacher_name', 'school_name', 'total_outputs']])
-    # Simplified milestone analysis – you can expand as needed
-    return {'top_div_teacher': 'N/A', 'top_div_school': 'N/A', 'top_div_outputs': 0, 'bottleneck_milestone': 'N/A', 'bottleneck_time': 0}
+        ts = metadata_df.groupby(['teacher_name','school_id_no']).size().reset_index(name='total_outputs')
+        sn = survey_df[['school_id_no','school_name']].drop_duplicates()
+        ts = ts.merge(sn, on='school_id_no', how='left').sort_values('total_outputs', ascending=False).head(20)
+        st.dataframe(ts[['teacher_name','school_name','total_outputs']])
+    return {'top_div_teacher': 'N/A', 'top_div_school': 'N/A', 'top_div_outputs': 0,
+            'bottleneck_milestone': 'N/A', 'bottleneck_time': 0}
 
 def school_comparison_dashboard(survey_df, history_per_school, school_info, selected_school_ids, dark_mode):
     st.markdown("### 📊 Comparative School Analysis")
@@ -2584,13 +2519,13 @@ def school_comparison_dashboard(survey_df, history_per_school, school_info, sele
     if not histories:
         st.info("No simulation history.")
         return
-    fig_comp = make_subplots(rows=2, cols=1, subplot_titles=("RCSI Comparison", "Milestone Comparison"))
+    fig = make_subplots(rows=2, cols=1, subplot_titles=("RCSI Comparison", "Milestone Comparison"))
     for sid, hist in histories.items():
         name = school_info[school_info['school_id_no']==sid]['school_name'].values[0]
-        fig_comp.add_trace(go.Scatter(x=hist['month'], y=hist['running_outcome'], mode='lines', name=f"{name} RCSI"), row=1, col=1)
-        fig_comp.add_trace(go.Scatter(x=hist['month'], y=hist['milestone'], mode='lines', name=f"{name} Milestone"), row=2, col=1)
-    fig_comp.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
-    st.plotly_chart(fig_comp, use_container_width=True)
+        fig.add_trace(go.Scatter(x=hist['month'], y=hist['running_outcome'], mode='lines', name=f"{name} RCSI"), row=1, col=1)
+        fig.add_trace(go.Scatter(x=hist['month'], y=hist['milestone'], mode='lines', name=f"{name} Milestone"), row=2, col=1)
+    fig.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
+    st.plotly_chart(fig, use_container_width=True)
 
 def interpret_avg_milestone(avg_milestone):
     if avg_milestone < 0.5: return f"{avg_milestone:.1f} → between M0 and M1"
@@ -2616,7 +2551,7 @@ if 'total_teachers' not in st.session_state:
 
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
-    dark_mode = st.checkbox("🌙 Dark Mode", value=False)
+    dark_mode = st.checkbox("🌙 Dark Mode", value=False, key="dark_mode")
     apply_theme(dark_mode)
 
     st.metric("🏫 Total Schools Loaded", st.session_state.num_schools)
@@ -2624,46 +2559,46 @@ with st.sidebar:
 
     st.markdown("---")
     st.markdown("#### 📊 Baseline Analysis")
-    baseline_btn = st.button("🔍 Analyze Baseline", use_container_width=True)
+    baseline_btn = st.button("🔍 Analyze Baseline", use_container_width=True, key="baseline_btn")
 
     st.markdown("---")
     st.markdown("### Policy Levers")
     col1, col2 = st.columns(2)
     with col1:
-        u_train = st.slider("Training freq.", 0.0, 1.0, 0.5, 0.05)
-        u_mentor = st.slider("Mentorship ratio", 0.0, 1.0, 0.5, 0.05)
-        u_budget = st.slider("Support budget", 0.0, 1.0, 0.5, 0.05)
+        u_train = st.slider("Training freq.", 0.0, 1.0, 0.5, 0.05, key="u_train")
+        u_mentor = st.slider("Mentorship ratio", 0.0, 1.0, 0.5, 0.05, key="u_mentor")
+        u_budget = st.slider("Support budget", 0.0, 1.0, 0.5, 0.05, key="u_budget")
     with col2:
-        u_lead = st.slider("Leadership commit.", 0.0, 1.0, 0.5, 0.05)
-        u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05)
+        u_lead = st.slider("Leadership commit.", 0.0, 1.0, 0.5, 0.05, key="u_lead")
+        u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05, key="u_collab")
     levers = {'u_train': u_train, 'u_mentor': u_mentor, 'u_budget': u_budget, 'u_lead': u_lead, 'u_collab': u_collab}
 
     st.markdown("---")
     st.markdown("### Simulation Parameters")
-    duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
-    random_events = st.checkbox("Enable random events", value=False)
-    use_survey = st.checkbox("Override with survey data", value=True)
+    duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9, key="duration")
+    random_events = st.checkbox("Enable random events", value=False, key="random_events")
+    use_survey = st.checkbox("Override with survey data", value=True, key="use_survey")
 
     st.markdown("---")
     st.markdown("### 🎲 Monte Carlo (Phase 2)")
-    mc_enabled = st.checkbox("Enable Monte Carlo", value=False)
-    mc_runs = st.number_input("Number of runs", min_value=10, max_value=100, value=30, step=10)
+    mc_enabled = st.checkbox("Enable Monte Carlo", value=False, key="mc_enabled")
+    mc_runs = st.number_input("Number of runs", min_value=10, max_value=100, value=30, step=10, key="mc_runs")
 
     st.markdown("---")
     st.markdown("### ⚙️ Simulation Actions")
     col_buttons = st.columns(3)
     with col_buttons[0]:
-        run_btn = st.button("🚀 Run", use_container_width=True)
+        run_btn = st.button("🚀 Run", use_container_width=True, key="run_btn")
     with col_buttons[1]:
-        step_btn = st.button("⏭️ Step", use_container_width=True)
+        step_btn = st.button("⏭️ Step", use_container_width=True, key="step_btn")
     with col_buttons[2]:
-        reset_btn = st.button("🔄 Reset", use_container_width=True)
+        reset_btn = st.button("🔄 Reset", use_container_width=True, key="reset_btn")
     st.caption("Run: full forecast. Step: one month. Reset: clear history.")
 
     st.markdown("---")
-    export_btn = st.button("📊 Export results (CSV)", use_container_width=True)
+    export_btn = st.button("📊 Export results (CSV)", use_container_width=True, key="export_btn")
 
-# Upload Wizard
+# Upload Wizard (with keys)
 with st.expander("📂 Step 1: Upload your CSV files", expanded=True):
     st.markdown("""
     - **Survey CSV:** `month, school_id_no, R, A, C, S, I, P, M`
@@ -2671,18 +2606,18 @@ with st.expander("📂 Step 1: Upload your CSV files", expanded=True):
     """)
     col1, col2 = st.columns(2)
     with col1:
-        survey_file = st.file_uploader("Survey CSV", type=["csv"], key="survey")
+        survey_file = st.file_uploader("Survey CSV", type=["csv"], key="survey_upload")
     with col2:
-        metadata_file = st.file_uploader("Metadata CSV", type=["csv"], key="metadata")
+        metadata_file = st.file_uploader("Metadata CSV", type=["csv"], key="metadata_upload")
     survey_template = """month,school_id_no,school_name,R,A,C,S,I,P,M
 2026-01,1,School_1,0.32,0.41,0.28,0.15,0.14,0.19,0.08"""
     metadata_template = """upload_date,teacher_name,school_id_no,document_type,title,theme,status,publication_link,utilized_by_school,utilization_date,year_undertaken,years_of_service,teacher_rank,educational_attainment
 2026-03-15,Anna Reyes,1,abstract,Improving Reading,Teaching Strategies,published,https://doi.org/10.1234,True,2026-02-10,2025,10,Teacher II,Master's"""
     c1, c2 = st.columns(2)
     with c1:
-        st.download_button("📄 Survey Template", survey_template, "survey_template.csv", "text/csv")
+        st.download_button("📄 Survey Template", survey_template, "survey_template.csv", "text/csv", key="survey_dl")
     with c2:
-        st.download_button("📄 Metadata Template", metadata_template, "metadata_template.csv", "text/csv")
+        st.download_button("📄 Metadata Template", metadata_template, "metadata_template.csv", "text/csv", key="meta_dl")
 
 # ------------------------------------------------------------
 # Main processing
@@ -2711,7 +2646,7 @@ if survey_file is not None and metadata_file is not None:
 
         school_ids = school_info['school_id_no'].tolist()
         school_options = [f"ID {sid}: {school_info[school_info['school_id_no']==sid]['school_name'].values[0]}" for sid in school_ids]
-        selected_school_label = st.selectbox("Select school", school_options, index=0)
+        selected_school_label = st.selectbox("Select school", school_options, index=0, key="school_selector")
         selected_school_id = int(selected_school_label.split(":")[0].split()[1])
         selected_school_name = school_info[school_info['school_id_no']==selected_school_id]['school_name'].values[0]
 
@@ -2771,7 +2706,7 @@ if survey_file is not None and metadata_file is not None:
 
         baseline_heatmap(survey_df, metadata_df, dark_mode)
 
-        # Phase 2: Calibration and agent parameters
+        # Calibration & agent params
         if 'calibrated_coeff' not in st.session_state:
             with st.spinner("Calibrating model coefficients..."):
                 coeff, calib_msg = calibrate_coefficients(survey_df)
@@ -2784,6 +2719,7 @@ if survey_file is not None and metadata_file is not None:
 
         agent_params = get_agent_params(school_ids, survey_df, metadata_df, st.session_state.calibrated_coeff)
 
+        # Initialise simulation if needed
         if 'sim' not in st.session_state:
             st.session_state.sim = Simulation(agent_params=agent_params)
             for agent in st.session_state.sim.agents:
@@ -2898,7 +2834,8 @@ if survey_file is not None and metadata_file is not None:
                 with st.expander("📊 Comparative School Analysis"):
                     all_schools = school_info['school_id_no'].tolist()
                     selected_comparison = st.multiselect("Select schools to compare", options=all_schools,
-                                                         format_func=lambda x: f"ID {x}: {school_info[school_info['school_id_no']==x]['school_name'].values[0]}")
+                                                         format_func=lambda x: f"ID {x}: {school_info[school_info['school_id_no']==x]['school_name'].values[0]}",
+                                                         key="comp_selector")
                     school_comparison_dashboard(survey_df, st.session_state.history, school_info, selected_comparison, dark_mode)
 
                 # Phase 2: Sensitivity Analysis
@@ -2925,7 +2862,7 @@ if survey_file is not None and metadata_file is not None:
                             else:
                                 st.info("Not enough Monte Carlo runs for causal analysis (need >10).")
 
-                # RCSI Table and Synopsis (simplified)
+                # RCSI Table & Synopsis
                 st.markdown("### 📈 RCSI Interpretation Table")
                 st.markdown("""
                 | RCSI Range | Level | Description |
@@ -2944,7 +2881,7 @@ if survey_file is not None and metadata_file is not None:
                         break
                 st.markdown(f"**Current RCSI:** {rcsi_val:.3f} → {rcsi_level}")
 
-            # Export functionality
+            # Export
             if export_btn:
                 all_data = []
                 for agent in st.session_state.sim.agents:
@@ -2961,7 +2898,7 @@ if survey_file is not None and metadata_file is not None:
                         cycle_records.append({'school_id': agent.real_id, 'cycle_number': rec.cycle_number,
                                               'total_improvement': rec.total_improvement, 'completion_month': rec.completion_month})
                 df_cycles = pd.DataFrame(cycle_records)
-                st.download_button("Download simulation history", df_hist.to_csv(index=False).encode('utf-8'), "simulation_history.csv")
-                st.download_button("Download cycle improvements", df_cycles.to_csv(index=False).encode('utf-8'), "cycle_improvements.csv")
+                st.download_button("Download simulation history", df_hist.to_csv(index=False).encode('utf-8'), "simulation_history.csv", key="dl_hist")
+                st.download_button("Download cycle improvements", df_cycles.to_csv(index=False).encode('utf-8'), "cycle_improvements.csv", key="dl_cycles")
 else:
     st.info("Please upload quarterly survey and research metadata CSV files to begin.")
