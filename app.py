@@ -607,8 +607,7 @@ def build_radar_chart(survey_values_tuple: tuple, school_name: str, dark_mode: b
         ],
         height=500, margin=dict(l=60, r=80, t=80, b=100)
     )
-    add_circular_arrow(fig)
-    return fig
+        return fig
 
 
 # ============================================================
