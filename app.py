@@ -1736,7 +1736,7 @@ if survey_file is not None and metadata_file is not None:
 else:
     st.info("Please upload quarterly survey and research metadata CSV files to begin.")
 # ============================================================
-# Phase 2 Digital Twin – CDO Research Culture Framework (Final)
+# Phase 2 Digital Twin – CDO Research Culture Framework (Clean)
 # ============================================================
 import streamlit as st
 import pandas as pd
@@ -1749,7 +1749,6 @@ from typing import List, Dict, Tuple
 import math
 import base64
 
-# Phase 2 additional imports
 try:
     from sklearn.linear_model import LinearRegression
     from sklearn.cluster import KMeans
@@ -1758,7 +1757,7 @@ except ImportError:
     SKLEARN_AVAILABLE = False
 
 # ============================================================
-# CDO Division Colour Palette
+# Colour Palette
 # ============================================================
 USTP_DARK_BLUE = "#0D2B5E"
 USTP_GOLD = "#F5A623"
@@ -1770,7 +1769,7 @@ DARK_TEXT = "#FFFFFF"
 LIGHT_TEXT = "#000000"
 
 # ------------------------------------------------------------
-# Apply Dark Mode CSS
+# Dark Mode CSS
 # ------------------------------------------------------------
 def apply_theme(dark_mode):
     if dark_mode:
@@ -1823,7 +1822,7 @@ def get_figure_download_link(fig, filename="chart.html", link_text="Download cha
     st.markdown(href, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# Data classes – SchoolAgent, CycleRecord, Simulation
+# Data classes
 # ------------------------------------------------------------
 @dataclass
 class CycleRecord:
@@ -1835,8 +1834,7 @@ class SchoolAgent:
     def __init__(self, unique_id,
                  initial_R=0.3, initial_A=0.2, initial_C=0.2,
                  initial_S=0.1, initial_I=0.1, initial_P=0.1, initial_M=0.0,
-                 coeff_dict=None,                     # ← BEFORE random_events_enabled
-                 random_events_enabled=False):
+                 coeff_dict=None, random_events_enabled=False):
         self.id = unique_id
         self.R = initial_R
         self.A = initial_A
@@ -1944,7 +1942,6 @@ class Simulation:
         if agent_params:
             self.agents = []
             for i, params in enumerate(agent_params):
-                # Explicit unpacking – no ambiguity
                 init_R, init_A, init_C, init_S, init_I, init_P, init_M, coeff = params
                 agent = SchoolAgent(i,
                                     initial_R=init_R,
@@ -1969,7 +1966,7 @@ class Simulation:
         return self.agents[idx]
 
 # ------------------------------------------------------------
-# Phase 2 – Calibration, Clustering, Sensitivity, Monte Carlo
+# Phase 2: Calibration, Clustering, Sensitivity, Monte Carlo
 # ------------------------------------------------------------
 def calibrate_coefficients(survey_df):
     if not SKLEARN_AVAILABLE:
@@ -2226,7 +2223,7 @@ def causal_analysis(monte_carlo_finals, baseline_values):
     return dict(zip(baseline_values.keys(), model.coef_))
 
 # ------------------------------------------------------------
-# Data processing (unchanged from Phase 1)
+# Data processing
 # ------------------------------------------------------------
 REQUIRED_SURVEY_COLS = ['month', 'school_id_no', 'R', 'A', 'C', 'S', 'I', 'P', 'M']
 REQUIRED_META_COLS = ['upload_date', 'teacher_name', 'school_id_no']
@@ -2542,15 +2539,12 @@ def interpret_avg_milestone(avg_milestone):
 st.set_page_config(page_title="CDO Research Culture Sustainability Framework", layout="wide")
 st.markdown("<h1 style='text-align: center; color: #0D2B5E;'>CDO Division Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
 
-if 'max_schools' not in st.session_state:
-    st.session_state.max_schools = 200
 if 'num_schools' not in st.session_state:
     st.session_state.num_schools = 0
 if 'total_teachers' not in st.session_state:
     st.session_state.total_teachers = 0
 
 with st.sidebar:
-    st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
     dark_mode = st.checkbox("🌙 Dark Mode", value=False, key="dark_mode")
     apply_theme(dark_mode)
 
@@ -2598,7 +2592,7 @@ with st.sidebar:
     st.markdown("---")
     export_btn = st.button("📊 Export results (CSV)", use_container_width=True, key="export_btn")
 
-# Upload Wizard (with keys)
+# Upload Wizard
 with st.expander("📂 Step 1: Upload your CSV files", expanded=True):
     st.markdown("""
     - **Survey CSV:** `month, school_id_no, R, A, C, S, I, P, M`
@@ -2650,7 +2644,6 @@ if survey_file is not None and metadata_file is not None:
         selected_school_id = int(selected_school_label.split(":")[0].split()[1])
         selected_school_name = school_info[school_info['school_id_no']==selected_school_id]['school_name'].values[0]
 
-        # Baseline section
         st.markdown("<h2 style='text-align: center;'>📋 Baseline from Uploaded Data</h2>", unsafe_allow_html=True)
         st.markdown("---")
         st.markdown("### Research Outputs (Recent)")
@@ -2719,7 +2712,6 @@ if survey_file is not None and metadata_file is not None:
 
         agent_params = get_agent_params(school_ids, survey_df, metadata_df, st.session_state.calibrated_coeff)
 
-        # Initialise simulation if needed
         if 'sim' not in st.session_state:
             st.session_state.sim = Simulation(agent_params=agent_params)
             for agent in st.session_state.sim.agents:
@@ -2734,7 +2726,6 @@ if survey_file is not None and metadata_file is not None:
             for agent in st.session_state.sim.agents:
                 agent.real_id = school_ids[agent.id]
 
-        # Run / Step / Reset
         if run_btn:
             st.session_state.sim = Simulation(agent_params=agent_params)
             for agent in st.session_state.sim.agents:
