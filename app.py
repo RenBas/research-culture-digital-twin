@@ -1063,7 +1063,7 @@ if survey_file is not None and metadata_file is not None:
 
         # Display Simulation Results
         if st.session_state.total_months > 0:
-            text_col = DARK_TEXT if dark_mode else 'inherit'
+            text_col = DARK_TEXT if dark_mode else LIGHT_TEXT
             st.markdown("<h2 style='text-align: center;'>Simulated Data</h2>", unsafe_allow_html=True)
             st.markdown("---")
             hist = st.session_state.history.get(selected_school_id)
