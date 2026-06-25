@@ -1,5 +1,5 @@
 # ============================================================
-# Digital Twin – CDO Research Culture Framework (Phase 1+2 Merged)
+# Digital Twin – CDO Research Culture Framework (Phase 1+2 Merged, Fixed)
 # ============================================================
 import streamlit as st
 import pandas as pd
@@ -544,7 +544,6 @@ def run_sensitivity(sim_class, agent_params, school_ids, levers, duration, use_s
                  title='Sensitivity of Final RCSI to Policy Levers (±10%)',
                  color_discrete_map={'Low Change': DEPED_RED, 'High Change': USTP_GOLD})
     fig.update_layout(template='plotly_white')
-    # Determine most impactful lever
     impacts = {lever: abs(results[(lever, 0.1)] - base_rcsi) + abs(results[(lever, -0.1)] - base_rcsi) for lever in lever_names}
     most_impactful = max(impacts, key=impacts.get)
     sensitivity_info = f"Sensitivity analysis shows that **{most_impactful}** has the greatest influence on final RCSI."
@@ -928,11 +927,6 @@ def division_level_analysis(metadata_df, history_per_school, sim_agents, dark_mo
     st.markdown("### Division-Level Analysis")
     if not metadata_df.empty:
         ts = metadata_df.groupby(['teacher_name', 'school_id_no']).size().reset_index(name='total_outputs')
-        # Merge school names
-        if 'school_name' not in ts.columns:
-            # get school names from survey (we don't have survey_df here, but we can use a simple placeholder)
-            # We'll skip school name merge for simplicity; just show school_id_no
-            pass
         ts = ts.sort_values('total_outputs', ascending=False).head(20)
         st.dataframe(ts[['teacher_name', 'school_id_no', 'total_outputs']])
         top_div_teacher = ts.iloc[0]['teacher_name'] if not ts.empty else "N/A"
@@ -940,7 +934,6 @@ def division_level_analysis(metadata_df, history_per_school, sim_agents, dark_mo
         top_div_outputs = ts.iloc[0]['total_outputs'] if not ts.empty else 0
     else:
         top_div_teacher = top_div_school = "N/A"; top_div_outputs = 0
-    # Milestone durations
     all_durations = {m: [] for m in range(7)}
     for sid, hist in history_per_school.items():
         if 'milestone' not in hist or not hist['milestone']:
@@ -1239,6 +1232,9 @@ if survey_file is not None and metadata_file is not None:
 
         # ---------- Simulation Results Display ----------
         if st.session_state.total_months > 0:
+            # Ensure text_col is defined for synopses (fix NameError)
+            text_col = DARK_TEXT if dark_mode else 'inherit'
+
             st.markdown("<h2 style='text-align: center;'>Simulated Data</h2>", unsafe_allow_html=True)
             st.markdown("---")
             hist = st.session_state.history.get(selected_school_id)
@@ -1264,8 +1260,7 @@ if survey_file is not None and metadata_file is not None:
                     fig1.add_annotation(text="No cycles completed yet", xref="x2 domain", yref="y2 domain",
                                         x=0.5, y=0.5, showarrow=False, row=2, col=2)
                 template = 'plotly_dark' if dark_mode else 'plotly_white'
-                text_color = USTP_GOLD if dark_mode else USTP_DARK_BLUE
-                fig1.update_layout(height=800, showlegend=True, font=dict(color=text_color), template=template)
+                fig1.update_layout(height=800, showlegend=True, font=dict(color=text_col), template=template)
                 st.plotly_chart(fig1, use_container_width=True)
                 get_figure_download_link(fig1, "simulation_overview.html", "Download Simulation Charts")
 
@@ -1339,7 +1334,6 @@ if survey_file is not None and metadata_file is not None:
                     milestone_progress = "is realising tangible impact and is approaching or has achieved cyclical sustainability."
                 key_R = hist['R'][-1] if hist['R'] else 0; key_M = hist['M'][-1] if hist['M'] else 0
 
-                # Additional insights from Phase 2
                 sens_text = sensitivity_info if sensitivity_info else ""
                 mc_text = st.session_state.get('mc_info', "")
 
