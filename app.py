@@ -1125,19 +1125,7 @@ def build_radar_chart(survey_values_tuple, school_name, dark_mode):
         fillcolor=f"rgba(245, 166, 35, 0.3)",
         hovertemplate='<b>%{theta}</b><br>Score: %{r:.3f}<extra></extra>'
     ))
-    # Arrowhead at top (0°)
-    arrow_r = [1.00, 0.94, 0.94, 1.00]
-    arrow_theta = [0, 8, -8, 0]
-    fig.add_trace(go.Scatterpolar(
-        r=arrow_r,
-        theta=arrow_theta,
-        mode='lines',
-        fill='toself',
-        line=dict(color=USTP_GOLD, width=1),
-        fillcolor=USTP_GOLD,
-        showlegend=False,
-        hoverinfo='none'
-    ))
+    # No arrow trace added
     template = 'plotly_dark' if dark_mode else 'plotly_white'
     fig.update_layout(
         template=template,
@@ -1154,12 +1142,7 @@ def build_radar_chart(survey_values_tuple, school_name, dark_mode):
         title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
         showlegend=False,
         font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
-        annotations=[
-            dict(text="↻ Milestone cycle direction (clockwise)", xref="paper", yref="paper",
-                 x=0.5, y=-0.12, showarrow=False,
-                 font=dict(size=13, color=USTP_GOLD if dark_mode else USTP_DARK_BLUE),
-                 bgcolor="rgba(255,255,255,0.0)", bordercolor="rgba(0,0,0,0)")
-        ],
+        # Annotation removed
         height=500, margin=dict(l=60, r=80, t=80, b=100)
     )
     return fig
