@@ -936,8 +936,7 @@ if survey_file is not None and metadata_file is not None:
     if survey_error: st.error(f"Survey error: {survey_error}")
     elif meta_error: st.error(f"Metadata error: {meta_error}")
     else:
-        else:
-                    actual_count = len(school_info)
+        actual_count = len(school_info)
         total_teachers = metadata_df['teacher_name'].nunique()
         state_changed = False
         if st.session_state.num_schools != actual_count:
