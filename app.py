@@ -98,8 +98,8 @@ class SchoolAgent:
     def __init__(self, unique_id,
                  initial_R=0.3, initial_A=0.2, initial_C=0.2,
                  initial_S=0.1, initial_I=0.1, initial_P=0.1, initial_M=0.0,
-                 random_events_enabled=False,
-                 coeff_dict=None):
+                 coeff_dict=None,                    # <-- now before random_events
+                 random_events_enabled=False):
         self.id = unique_id
         self.R = initial_R
         self.A = initial_A
