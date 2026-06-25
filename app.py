@@ -972,13 +972,9 @@ if survey_file is not None and metadata_file is not None:
             <div style="background-color: {bg_color}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
             <b>School: {selected_school_name}</b><br>
             Baseline RCSI: {bs['baseline_rcsi']:.3f}<br>
-            Strengths (≥0.6): {', '.join(bs['strengths']) if bs['strengths'] else 'None'}<br>
-            Critical Gaps (≤0.3): {', '.join(bs['gaps']) if bs['gaps'] else 'None'}<br>
-            Moderate (0.3–0.6): {', '.join(bs['moderate']) if bs['moderate'] else 'None'}<br>
-            Actionable Recommendations:<br>{'<br>'.join(bs['recommendations'])}
+            …
             </div>
             """, unsafe_allow_html=True)
-
         baseline_heatmap(survey_df, metadata_df, dark_mode)
 
         # Phase 2: Calibration & Agent Params
