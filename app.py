@@ -10,15 +10,7 @@ from plotly.subplots import make_subplots
 from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple
 import math
-import io
 import base64
-
-# For chart export (PNG) - make sure kaleido is installed: pip install kaleido
-try:
-    import plotly.io as pio
-    KALEIDO_AVAILABLE = True
-except ImportError:
-    KALEIDO_AVAILABLE = False
 
 # ============================================================
 # CDO Division Colour Palette
@@ -33,7 +25,7 @@ DARK_TEXT = "#FFFFFF"
 LIGHT_TEXT = "#000000"
 
 # ------------------------------------------------------------
-# Apply Dark Mode CSS (slightly polished for Phase 1)
+# Apply Dark Mode CSS
 # ------------------------------------------------------------
 def apply_theme(dark_mode):
     if dark_mode:
@@ -80,22 +72,17 @@ def apply_theme(dark_mode):
         """, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# Helper to download a Plotly figure as PNG
+# PHASE 1: Chart download as interactive HTML (no Kaleido needed)
 # ------------------------------------------------------------
-def get_figure_download_link(fig, filename="chart.png", link_text="Download chart as PNG"):
-    if not KALEIDO_AVAILABLE:
-        st.warning("Kaleido not installed. Install via `pip install kaleido` to enable chart downloads.")
-        return
-    try:
-        img_bytes = pio.to_image(fig, format="png", scale=2)
-        b64 = base64.b64encode(img_bytes).decode()
-        href = f'<a href="data:image/png;base64,{b64}" download="{filename}">{link_text}</a>'
-        st.markdown(href, unsafe_allow_html=True)
-    except Exception as e:
-        st.error(f"Error generating image: {e}")
+def get_figure_download_link(fig, filename="chart.html", link_text="Download chart (interactive HTML)"):
+    """Generate a download link for an interactive Plotly figure as a self‑contained HTML file."""
+    html_str = fig.to_html(include_plotlyjs='cdn', full_html=True)
+    b64 = base64.b64encode(html_str.encode()).decode()
+    href = f'<a href="data:text/html;base64,{b64}" download="{filename}">{link_text}</a>'
+    st.markdown(href, unsafe_allow_html=True)
 
 # ------------------------------------------------------------
-# Data classes (unchanged)
+# Data classes (unchanged from original)
 # ------------------------------------------------------------
 @dataclass
 class CycleRecord:
@@ -193,7 +180,7 @@ class Simulation:
         P = np.array([a.P for a in self.agents])
         M = np.array([a.M for a in self.agents])
 
-        # Vectorized variable updates (identical equations)
+        # Vectorized variable updates
         u_lead_eff = np.minimum(1.0, u_lead + 0.05 * M)
         R_new = R + 0.02 * M - 0.01 * (1 - u_lead_eff)
         A_new = A + 0.04 * R + 0.02 * u_train + 0.01 * M - 0.005
@@ -203,7 +190,7 @@ class Simulation:
         P_new = P + 0.04 * u_collab + 0.02 * I - 0.01
         M_new = M + 0.02 * C + 0.02 * P - 0.005
 
-        # Clamp in-place
+        # Clamp
         min_v, max_v = 0.1, 1.0
         R_new = np.clip(R_new, min_v, max_v)
         A_new = np.clip(A_new, min_v, max_v)
@@ -234,7 +221,7 @@ class Simulation:
         return self.agents[idx]
 
 # ------------------------------------------------------------
-# PHASE 1: Robust data processing functions with caching
+# PHASE 1: Robust data processing with caching
 # ------------------------------------------------------------
 REQUIRED_SURVEY_COLS = ['month', 'school_id_no', 'R', 'A', 'C', 'S', 'I', 'P', 'M']
 OPTIONAL_SURVEY_COLS = ['school_name']
@@ -270,7 +257,6 @@ def process_survey(_survey_df):
         if 'school_id_no' in df.columns:
             df['school_id_no'] = df['school_id_no'].astype(int)
         else:
-            # Attempt to derive from 'school_id' if present
             if 'school_id' in df.columns:
                 df['school_id_no'] = df['school_id'].astype(str).apply(
                     lambda x: int(x.split('_')[-1]) if '_' in str(x) else int(x)
@@ -284,7 +270,7 @@ def process_survey(_survey_df):
         else:
             df['school_name'] = df['school_name'].fillna(df['school_id_no'].apply(lambda x: f"School_{x}"))
 
-        # Convert month string to numeric (format YYYY-MM)
+        # Convert month string to numeric (YYYY-MM)
         def month_str_to_num(month_str):
             try:
                 parts = str(month_str).strip().split('-')
@@ -353,7 +339,7 @@ def process_metadata(_metadata_df):
         except:
             return None, "Could not parse 'upload_date' as datetime."
 
-        # Convert utilized_by_school to boolean if not already
+        # Convert utilized_by_school to boolean
         if df['utilized_by_school'].dtype != bool:
             df['utilized_by_school'] = df['utilized_by_school'].astype(str).str.lower().map(
                 {'true': True, '1': True, 'yes': True, 'false': False, '0': False, 'no': False}
@@ -424,14 +410,14 @@ def interpret_utilisation_rate(rate):
     else:
         return "Very High", "Excellent utilisation; research is consistently applied to improve practice."
 
-# ---------- PHASE 1: Research Outputs Dashboard (now returns dict of figures & metrics) ----------
+# ---------- PHASE 1: Research Outputs Dashboard (cached) ----------
 @st.cache_data(show_spinner=False)
 def compute_research_outputs_dashboard(metadata_df, school_id, school_name, dark_mode):
-    """Return a dictionary with all figures and key metrics. This is cached to avoid recomputation."""
+    """Return a dict with all figures and key metrics for a school."""
     school_meta = metadata_df[metadata_df['school_id_no'] == school_id]
     results = {'figs': {}, 'metrics': {}}
     if school_meta.empty:
-        return results  # empty
+        return results
 
     # 1) Theme Distribution
     theme_counts = school_meta['theme'].value_counts().reset_index()
@@ -444,7 +430,7 @@ def compute_research_outputs_dashboard(metadata_df, school_id, school_name, dark
     top_theme = theme_counts.iloc[0]['Theme'] if not theme_counts.empty else "N/A"
     results['metrics']['top_theme'] = top_theme
 
-    # 2) Theme Utilisation Rate (if column exists)
+    # 2) Theme Utilisation Rate
     if 'utilized_by_school' in school_meta.columns:
         theme_util = school_meta.groupby('theme')['utilized_by_school'].mean().reset_index()
         theme_util.columns = ['Theme', 'Utilisation Rate']
@@ -476,7 +462,7 @@ def compute_research_outputs_dashboard(metadata_df, school_id, school_name, dark
     results['metrics']['pub_rate'] = pub_rate
     results['metrics']['total_outputs'] = total
 
-    # 4) Research Output Timeline (by quarter)
+    # 4) Research Output Timeline
     if 'upload_date' in school_meta.columns:
         school_meta_copy = school_meta.copy()
         school_meta_copy['quarter'] = school_meta_copy['upload_date'].dt.to_period('Q').astype(str)
@@ -604,7 +590,7 @@ def compute_research_outputs_dashboard(metadata_df, school_id, school_name, dark
 
     return results
 
-# ---------- Baseline Synopsis Generator (unchanged) ----------
+# ---------- Baseline Synopsis Generator ----------
 def generate_baseline_synopsis(survey_row, school_name, metadata_df):
     variables = ['R','A','C','S','I','P','M']
     values = {v: survey_row[v] for v in variables}
@@ -634,7 +620,7 @@ def generate_baseline_synopsis(survey_row, school_name, metadata_df):
         'values': values
     }
 
-# ---------- Baseline Heatmap (unchanged, but uses cached processing) ----------
+# ---------- Baseline Heatmap ----------
 def baseline_heatmap(survey_df, metadata_df, dark_mode):
     st.markdown("### 📊 Historical Correlation Matrix (Diagnostic)")
     if survey_df is None or metadata_df is None:
@@ -655,7 +641,7 @@ def baseline_heatmap(survey_df, metadata_df, dark_mode):
     st.plotly_chart(fig_corr, use_container_width=True)
     st.caption("📌 This heatmap shows the correlation between the seven variables and research output count in the uploaded historical data.")
 
-# ---------- Other analysis functions (unchanged except caching where possible) ----------
+# ---------- Cycle vs Research Outputs ----------
 def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     if not agent.cycle_improvements:
         st.info("No cycles completed yet for this school.")
@@ -686,53 +672,129 @@ def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     elif len(cumulative_outputs) == 1:
         st.caption("📝 First cycle completed. Continued output needed.")
 
-# Division-Level Analysis (returns dict of metrics and figures)
-@st.cache_data(show_spinner=False)
-def compute_division_analysis(survey_df, metadata_df, history_per_school, sim_agents, dark_mode):
-    # Note: history_per_school is a dict of dicts, not directly hashable; we'll pass it as a JSON string or ignore caching.
-    # For simplicity, we'll not cache this function because it depends on mutable simulation state.
-    # Instead we compute inside the main flow and return dict. We'll keep the old function but no caching.
-    pass  # We'll not change division_level_analysis; it will remain as before.
-
+# ---------- Division‑Level Analysis (unchanged) ----------
 def division_level_analysis(survey_df, metadata_df, history_per_school, sim_agents, dark_mode):
     st.markdown("### 🔍 Division‑Level Analysis")
-    # ... original code unchanged ...
-    # (Due to length, I'll not fully reproduce, but note it's unchanged except we add chart download buttons later)
 
-# School Comparison Dashboard (unchanged, but we can add caching for the figure)
+    # ---- 1. Teacher Productivity Leaderboard ----
+    st.markdown("#### 🏆 Teacher Productivity Leaderboard (Division‑Wide)")
+    if not metadata_df.empty:
+        teacher_summary = metadata_df.groupby(['teacher_name', 'school_id_no']).size().reset_index(name='total_outputs')
+        school_names = survey_df[['school_id_no', 'school_name']].drop_duplicates()
+        teacher_summary = teacher_summary.merge(school_names, on='school_id_no', how='left')
+        if 'teacher_rank' in metadata_df.columns:
+            rank_info = metadata_df.groupby('teacher_name')['teacher_rank'].first().reset_index()
+            teacher_summary = teacher_summary.merge(rank_info, on='teacher_name', how='left')
+        if 'educational_attainment' in metadata_df.columns:
+            edu_info = metadata_df.groupby('teacher_name')['educational_attainment'].first().reset_index()
+            teacher_summary = teacher_summary.merge(edu_info, on='teacher_name', how='left')
+        if 'years_of_service' in metadata_df.columns:
+            service_info = metadata_df.groupby('teacher_name')['years_of_service'].first().reset_index()
+            teacher_summary = teacher_summary.merge(service_info, on='teacher_name', how='left')
+        teacher_summary = teacher_summary.sort_values('total_outputs', ascending=False).head(20)
+        st.dataframe(teacher_summary[['teacher_name', 'school_name', 'total_outputs', 'teacher_rank', 'educational_attainment', 'years_of_service']])
+        st.caption("📝 Top 20 teachers across the division by research output count.")
+        top_div_teacher = teacher_summary.iloc[0]['teacher_name'] if not teacher_summary.empty else "N/A"
+        top_div_school = teacher_summary.iloc[0]['school_name'] if not teacher_summary.empty else "N/A"
+        top_div_outputs = teacher_summary.iloc[0]['total_outputs'] if not teacher_summary.empty else 0
+    else:
+        top_div_teacher = top_div_school = "N/A"
+        top_div_outputs = 0
+
+    # ---- 2. Milestone Transition Analysis ----
+    st.markdown("#### ⏱️ Milestone Transition Analysis (Average Months per Milestone)")
+    all_durations = {m: [] for m in range(7)}
+    for agent in sim_agents:
+        hist = history_per_school.get(agent.real_id)
+        if hist and 'milestone' in hist:
+            milestones = hist['milestone']
+            for i in range(1, len(milestones)):
+                if milestones[i] != milestones[i-1]:
+                    start = milestones.index(milestones[i-1], 0, i) if milestones[i-1] in milestones[:i] else i-1
+                    duration = i - start
+                    all_durations[milestones[i-1]].append(duration)
+            if milestones:
+                last_milestone = milestones[-1]
+                start = milestones.index(last_milestone, 0, len(milestones)) if last_milestone in milestones else len(milestones)-1
+                duration = len(milestones) - start
+                all_durations[last_milestone].append(duration)
+    avg_durations = {m: np.mean(v) if v else np.nan for m, v in all_durations.items()}
+    durations_df = pd.DataFrame({
+        'Milestone': [f'M{i}' for i in range(7)],
+        'Avg Months': [avg_durations.get(i, np.nan) for i in range(7)]
+    }).dropna()
+    bottleneck_milestone = "N/A"
+    bottleneck_time = 0
+    if not durations_df.empty:
+        fig_dur = px.bar(durations_df, x='Milestone', y='Avg Months',
+                         title="Average Months Spent per Milestone",
+                         color='Avg Months', color_continuous_scale=['#F5A623', '#0D2B5E'])
+        fig_dur.update_layout(template='plotly_dark' if dark_mode else 'plotly_white',
+                              xaxis_title='Milestone', yaxis_title='Average Months')
+        st.plotly_chart(fig_dur, use_container_width=True)
+        get_figure_download_link(fig_dur, "milestone_durations.html")
+        max_row = durations_df.loc[durations_df['Avg Months'].idxmax()]
+        bottleneck_milestone = max_row['Milestone']
+        bottleneck_time = max_row['Avg Months']
+        st.caption(f"📝 Schools spend the most time on average in Milestone {bottleneck_milestone} ({bottleneck_time:.1f} months). This indicates a potential bottleneck.")
+    else:
+        st.info("Not enough transition data to compute milestone durations.")
+
+    return {
+        'top_div_teacher': top_div_teacher,
+        'top_div_school': top_div_school,
+        'top_div_outputs': top_div_outputs,
+        'bottleneck_milestone': bottleneck_milestone,
+        'bottleneck_time': bottleneck_time
+    }
+
+# ---------- School Comparison Dashboard ----------
 def school_comparison_dashboard(survey_df, history_per_school, school_info, selected_school_ids, dark_mode):
-    # ... original code unchanged ...
-    pass
+    st.markdown("### 📊 Comparative School Analysis")
+    if len(selected_school_ids) < 2:
+        st.info("Please select at least two schools to compare.")
+        return
 
-# ------------------------------------------------------------
-# PHASE 1: Enhanced UI – Guided upload wizard
-# ------------------------------------------------------------
-def show_upload_wizard():
-    """Display a step-by-step wizard for data upload."""
-    with st.expander("📂 Step 1: Upload your CSV files", expanded=True):
-        st.markdown("""
-        **Instructions:**
-        - Upload your **Quarterly Survey** CSV (must contain columns: `month, school_id_no, R, A, C, S, I, P, M`).
-        - Upload your **Research Metadata** CSV (must contain columns: `upload_date, teacher_name, school_id_no`).
-        - You can download templates below.
-        """)
-        col1, col2 = st.columns(2)
-        with col1:
-            survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
-        with col2:
-            metadata_file = st.file_uploader("Upload research metadata (CSV)", type=["csv"], key="metadata")
-        st.markdown("---")
-        st.markdown("**Need templates?**")
-        survey_template = """month,school_id_no,school_name,R,A,C,S,I,P,M
-2026-01,1,School_1,0.32,0.41,0.28,0.15,0.14,0.19,0.08"""
-        metadata_template = """upload_date,teacher_name,school_id_no,document_type,title,theme,status,publication_link,utilized_by_school,utilization_date,year_undertaken,years_of_service,teacher_rank,educational_attainment
-2026-03-15,Anna Reyes,1,abstract,Improving Reading,Teaching Strategies,published,https://doi.org/10.1234,True,2026-02-10,2025,10,Teacher II,Master's"""
-        c1, c2 = st.columns(2)
-        with c1:
-            st.download_button("📄 Survey Template", survey_template, "quarterly_survey_template.csv", "text/csv")
-        with c2:
-            st.download_button("📄 Metadata Template", metadata_template, "research_metadata_template.csv", "text/csv")
-        return survey_file, metadata_file
+    histories = {}
+    for sid in selected_school_ids:
+        hist = history_per_school.get(sid)
+        if hist:
+            histories[sid] = hist
+
+    if not histories:
+        st.info("No simulation history for selected schools. Run the simulation first.")
+        return
+
+    fig_comp = make_subplots(rows=2, cols=1, subplot_titles=("RCSI Comparison", "Milestone Comparison"))
+    for sid, hist in histories.items():
+        school_name = school_info[school_info['school_id_no']==sid]['school_name'].values[0] if sid in school_info['school_id_no'].values else f"School {sid}"
+        fig_comp.add_trace(go.Scatter(x=hist['month'], y=hist['running_outcome'], mode='lines', name=f"{school_name} RCSI"), row=1, col=1)
+        fig_comp.add_trace(go.Scatter(x=hist['month'], y=hist['milestone'], mode='lines', name=f"{school_name} Milestone"), row=2, col=1)
+    fig_comp.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
+    fig_comp.update_xaxes(title_text="Month", row=1, col=1)
+    fig_comp.update_yaxes(title_text="RCSI", row=1, col=1)
+    fig_comp.update_xaxes(title_text="Month", row=2, col=1)
+    fig_comp.update_yaxes(title_text="Milestone", row=2, col=1)
+    st.plotly_chart(fig_comp, use_container_width=True)
+    get_figure_download_link(fig_comp, "comparison.html")
+    st.caption("📝 Overlay of RCSI and Milestone progress for selected schools. Compare which schools are advancing faster and which are lagging.")
+
+# ---------- Interpretation helper ----------
+def interpret_avg_milestone(avg_milestone):
+    if avg_milestone < 0.5:
+        return f"{avg_milestone:.1f} → between Milestone 0 (Readiness and Relevance) and Milestone 1 (Awareness to Action), approaching M1"
+    elif avg_milestone < 1.5:
+        return f"{avg_milestone:.1f} → between Milestone 1 (Awareness to Action) and Milestone 2 (Capacity Spark)"
+    elif avg_milestone < 2.5:
+        return f"{avg_milestone:.1f} → between Milestone 2 (Capacity Spark) and Milestone 3 (Structured Support)"
+    elif avg_milestone < 3.5:
+        return f"{avg_milestone:.1f} → between Milestone 3 (Structured Support) and Milestone 4 (Institutional Anchoring)"
+    elif avg_milestone < 4.5:
+        return f"{avg_milestone:.1f} → between Milestone 4 (Institutional Anchoring) and Milestone 5 (Community of Practice)"
+    elif avg_milestone < 5.5:
+        return f"{avg_milestone:.1f} → between Milestone 5 (Community of Practice) and Milestone 6 (Impact Realization)"
+    else:
+        return f"{avg_milestone:.1f} → at or beyond Milestone 6 (Impact Realization)"
 
 # ------------------------------------------------------------
 # Streamlit UI
@@ -786,15 +848,42 @@ with st.sidebar:
         step_btn = st.button("⏭️ Step (1 month)", use_container_width=True)
     with col_buttons[2]:
         reset_btn = st.button("🔄 Reset", use_container_width=True)
-    st.caption("**Run:** Full forecast for selected duration (resets history). **Step:** Advance one month without resetting.")
+    st.caption("**Run:** Full forecast for selected duration (resets history). **Step:** Advance one month without resetting (observe gradual changes).")
 
     st.markdown("---")
     st.markdown("#### 📥 Export Data")
     export_btn = st.button("📊 Export results (CSV)", use_container_width=True)
 
-# Main area: Wizard
-survey_file, metadata_file = show_upload_wizard()
+# ------------------------------------------------------------
+# PHASE 1: Guided Upload Wizard
+# ------------------------------------------------------------
+with st.expander("📂 Step 1: Upload your CSV files", expanded=True):
+    st.markdown("""
+    **Instructions:**
+    - Upload your **Quarterly Survey** CSV (must contain columns: `month, school_id_no, R, A, C, S, I, P, M`).
+    - Upload your **Research Metadata** CSV (must contain columns: `upload_date, teacher_name, school_id_no`).
+    - You can download templates below.
+    """)
+    col1, col2 = st.columns(2)
+    with col1:
+        survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
+    with col2:
+        metadata_file = st.file_uploader("Upload research metadata (CSV)", type=["csv"], key="metadata")
+    st.markdown("---")
+    st.markdown("**Need templates?**")
+    survey_template = """month,school_id_no,school_name,R,A,C,S,I,P,M
+2026-01,1,School_1,0.32,0.41,0.28,0.15,0.14,0.19,0.08"""
+    metadata_template = """upload_date,teacher_name,school_id_no,document_type,title,theme,status,publication_link,utilized_by_school,utilization_date,year_undertaken,years_of_service,teacher_rank,educational_attainment
+2026-03-15,Anna Reyes,1,abstract,Improving Reading,Teaching Strategies,published,https://doi.org/10.1234,True,2026-02-10,2025,10,Teacher II,Master's"""
+    c1, c2 = st.columns(2)
+    with c1:
+        st.download_button("📄 Survey Template", survey_template, "quarterly_survey_template.csv", "text/csv")
+    with c2:
+        st.download_button("📄 Metadata Template", metadata_template, "research_metadata_template.csv", "text/csv")
 
+# ------------------------------------------------------------
+# Main area
+# ------------------------------------------------------------
 if survey_file is not None and metadata_file is not None:
     # Process with robust functions
     survey_df_raw = pd.read_csv(survey_file)
@@ -835,7 +924,7 @@ if survey_file is not None and metadata_file is not None:
         else:
             st.info("No research outputs for this school.")
 
-        # Radar chart with cached figure
+        # Radar chart with cached figure + download
         latest = get_latest_survey(survey_df, selected_school_id)
         if latest is not None:
             col_left, col_right = st.columns([1, 5])
@@ -855,8 +944,7 @@ if survey_file is not None and metadata_file is not None:
                 survey_tuple = (latest['R'], latest['A'], latest['C'], latest['S'], latest['I'], latest['P'], latest['M'])
                 radar_fig = build_radar_chart(survey_tuple, selected_school_name, dark_mode)
                 st.plotly_chart(radar_fig, use_container_width=True)
-                # Download chart
-                get_figure_download_link(radar_fig, "radar_chart.png", "📥 Download Radar Chart")
+                get_figure_download_link(radar_fig, "radar_chart.html", "📥 Download Radar Chart")
                 st.caption("📌 The distance from the centre (0) to each milestone point represents the strength of that milestone.")
         else:
             st.info("No survey data for current quarter.")
@@ -865,19 +953,15 @@ if survey_file is not None and metadata_file is not None:
         with st.expander("📚 Research Outputs Dashboard (for selected school)"):
             dashboard_data = compute_research_outputs_dashboard(metadata_df, selected_school_id, selected_school_name, dark_mode)
             if dashboard_data['figs']:
-                # Render figures
                 for name, fig in dashboard_data['figs'].items():
                     st.plotly_chart(fig, use_container_width=True)
-                    # Add download button for each
-                    get_figure_download_link(fig, f"{name}.png", f"Download {name}")
-                # Display metrics
+                    get_figure_download_link(fig, f"{name}.html", f"Download {name}")
                 metrics = dashboard_data['metrics']
                 st.metric("📘 School‑level Research Utilisation Rate",
                           f"{metrics.get('util_rate', 0):.1f}% → {metrics.get('util_level', 'N/A')} level",
                           help=metrics.get('util_desc', ''))
                 if metrics.get('top_teacher') != "N/A":
                     st.caption(f"📝 Top teacher: {metrics['top_teacher']}")
-                # ... (additional captions can be added as needed)
             else:
                 st.info("No data available for this school.")
 
@@ -909,7 +993,7 @@ if survey_file is not None and metadata_file is not None:
         # Baseline Heatmap
         baseline_heatmap(survey_df, metadata_df, dark_mode)
 
-        # Initialize simulation (same as before)
+        # Initialize simulation (only if needed)
         if 'sim' not in st.session_state:
             st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
             st.session_state.current_month = 0
@@ -925,9 +1009,8 @@ if survey_file is not None and metadata_file is not None:
                 agent.C = min(1.0, agent.C + len(sm[sm['document_type']=='full_paper'])*0.005)
                 agent.P = min(1.0, agent.P + sm['theme'].nunique()*0.01)
 
-        # Run / Step / Reset buttons (unchanged logic, but using vectorized step)
+        # Run / Step / Reset buttons (using vectorized step)
         if run_btn:
-            # Re-init sim
             st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
             for idx, agent in enumerate(st.session_state.sim.agents):
                 agent.real_id = school_ids[idx]
@@ -994,14 +1077,14 @@ if survey_file is not None and metadata_file is not None:
             st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
             st.rerun()
 
-        # Simulation results (unchanged in logic, but can add chart downloads)
+        # Simulation results display (only if simulation has run)
         if st.session_state.total_months > 0:
             st.markdown("<h2 style='text-align: center;'>⚙️ Simulated Data</h2>", unsafe_allow_html=True)
             st.markdown("---")
             hist = st.session_state.history.get(selected_school_id, None)
             agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
             if hist and agent:
-                # Main plots (use cached figure building? Could cache but dynamic; keep as is)
+                # Main plots
                 fig1 = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress", "Research Culture Sustainability Index (RCSI)", "Improvement per Completed Cycle"))
                 colors = ['#1E88E5', USTP_GOLD, '#8E44AD', '#2ECC71', '#E67E22', DEPED_RED, '#1ABC9C']
                 vars_ = ['R','A','C','S','I','P','M']
@@ -1026,18 +1109,248 @@ if survey_file is not None and metadata_file is not None:
                 fig1.update_xaxes(title_text="Cycle Number", row=2, col=2)
                 fig1.update_yaxes(title_text="RCSI", row=2, col=2)
                 st.plotly_chart(fig1, use_container_width=True)
-                get_figure_download_link(fig1, "simulation_overview.png", "📥 Download Simulation Charts")
+                get_figure_download_link(fig1, "simulation_overview.html", "📥 Download Simulation Charts")
 
+                # Cycle vs Research Outputs
                 with st.expander("🔄 Cycle vs Research Outputs"):
                     cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
 
+                # Division‑Level Analysis
                 with st.expander("🏢 Division‑Level Analysis"):
                     div_metrics = division_level_analysis(survey_df, metadata_df, st.session_state.history, st.session_state.sim.agents, dark_mode)
 
-                # ... (remaining synopses and comparison sections unchanged)
-                # RCSI table, simulation synopsis, baseline comparison, etc. (keep as before)
+                # Comparative School Analysis
+                with st.expander("📊 Comparative School Analysis"):
+                    all_schools = school_info['school_id_no'].tolist()
+                    selected_comparison = st.multiselect(
+                        "Select schools to compare (choose at least two)",
+                        options=all_schools,
+                        default=[],
+                        format_func=lambda x: f"ID {x}: {school_info[school_info['school_id_no']==x]['school_name'].values[0]}"
+                    )
+                    school_comparison_dashboard(survey_df, st.session_state.history, school_info, selected_comparison, dark_mode)
 
-            # Export functionality unchanged
+                # RCSI Interpretation Table
+                st.markdown("### 📈 Research Culture Sustainability Index (RCSI) Interpretation Table")
+                st.markdown("""
+                | RCSI Range | Level | Description |
+                |------------|-------|-------------|
+                | 0.0 – 0.2 | Very Low | Little to no accumulated research culture strength. |
+                | 0.2 – 0.4 | Low | Minimal ecosystem vitality; research culture still weak. |
+                | 0.4 – 0.6 | Moderate | Noticeable strength; research culture developing. |
+                | 0.6 – 0.8 | High | Strong ecosystem; research culture becoming sustainable. |
+                | 0.8 – 1.0 | Very High | Excellent vitality; research culture fully embedded. |
+                """)
 
+                # Simulation Synopsis (same logic as original, just keep)
+                # ... (the rest of the synopsis code unchanged)
+                # I'll include the synopsis generation, but note it's long; I'll keep it as is.
+                # (I'll copy the synopsis code from the original, but since it's unchanged, it's omitted here for brevity – it's part of the original script, just after the table.)
+                # Actually, let's include the full synopsis code to be complete.
+                rcsi_val = agent.running_total_outcome
+                rcsi_level = "Exceptional"
+                for low, high, lev in [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]:
+                    if low <= rcsi_val < high:
+                        rcsi_level = lev
+                        break
+                milestone_names = {0:"Milestone 0 (Readiness and Relevance)",1:"Milestone 1 (Awareness to Action)",
+                                   2:"Milestone 2 (Capacity Spark)",3:"Milestone 3 (Structured Support)",
+                                   4:"Milestone 4 (Institutional Anchoring)",5:"Milestone 5 (Community of Practice)",
+                                   6:"Milestone 6 (Impact Realization)"}
+                milestone_name = milestone_names.get(agent.current_milestone, f"Milestone {agent.current_milestone}")
+                if agent.cycle_count >= 2:
+                    cycle_text = f"has completed {agent.cycle_count} full cycles, indicating a self‑sustaining research culture."
+                elif agent.cycle_count == 1:
+                    cycle_text = "has completed one full cycle, demonstrating initial sustainability."
+                else:
+                    cycle_text = "has not yet completed any full cycle."
+                if agent.current_milestone == 0:
+                    milestone_progress = "is at the very beginning of the journey."
+                elif agent.current_milestone <= 2:
+                    milestone_progress = "has moved beyond initial readiness but remains in early capacity‑building phases."
+                elif agent.current_milestone <= 4:
+                    milestone_progress = "has established structured support and is embedding research into institutional practice."
+                else:
+                    milestone_progress = "is realising tangible impact and is approaching or has achieved cyclical sustainability."
+                key_R = hist['R'][-1] if hist['R'] else 0
+                key_M = hist['M'][-1] if hist['M'] else 0
+                # Additional insights from school_metrics (if computed)
+                school_metrics = dashboard_data['metrics'] if dashboard_data else {}
+                output_trend_text = ""
+                if school_metrics.get('output_timeline') is not None:
+                    tl = school_metrics['output_timeline']
+                    if len(tl) >= 2:
+                        if tl.iloc[-1]['count'] > tl.iloc[-2]['count']:
+                            output_trend_text = "Research output is increasing over time."
+                        elif tl.iloc[-1]['count'] < tl.iloc[-2]['count']:
+                            output_trend_text = "Research output is declining over time."
+                        else:
+                            output_trend_text = "Research output has remained stable."
+                        avg_output = tl['count'].mean()
+                        output_trend_text += f" On average, the school produces {avg_output:.1f} outputs per quarter."
+                theme_util_text = ""
+                if school_metrics.get('theme_util_df') is not None:
+                    tu = school_metrics['theme_util_df']
+                    if not tu.empty:
+                        max_util = tu.loc[tu['Utilisation Rate'].idxmax()]
+                        min_util = tu.loc[tu['Utilisation Rate'].idxmin()]
+                        theme_util_text = f"The most utilised theme is '{max_util['Theme']}' ({max_util['Utilisation Rate']:.0%}), while '{min_util['Theme']}' has the lowest adoption ({min_util['Utilisation Rate']:.0%})."
+                top_teacher_text = ""
+                if school_metrics.get('top_teacher') != "N/A":
+                    top_teacher_text = f"The school's top researcher is {school_metrics['top_teacher']}."
+                coherent_text = f"""
+                After {st.session_state.total_months} months, {selected_school_name} (ID {selected_school_id}) has reached {milestone_name} and {cycle_text}
+                The school’s Research Culture Sustainability Index (RCSI) is <b>{rcsi_val:.3f}</b>, which falls into the <b>{rcsi_level}</b> level.
+                Key indicators: Readiness (R) = {key_R:.2f}, Impact (M) = {key_M:.2f}, and current Milestone = {agent.current_milestone}.
+                This combination suggests that {milestone_progress}
+                The RCSI level <b>{rcsi_level.lower()}</b> reinforces this assessment.
+                📊 {output_trend_text}
+                📘 {theme_util_text}
+                🏆 {top_teacher_text}
+                Overall, the school is on a path toward research culture sustainability, but further policy support may be needed.
+                """
+                st.markdown(f"""
+                <div style="background-color: {'#2E2E2E' if dark_mode else '#E3F2FD'}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {DARK_TEXT if dark_mode else 'inherit'};">
+                <b>📌 School {selected_school_id} ({selected_school_name}) – Simulation Synopsis</b><br>
+                {coherent_text}
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Baseline vs Simulation Comparison (if baseline exists)
+                if 'baseline_synopsis' in st.session_state and 'baseline_survey_row' in st.session_state:
+                    bs = st.session_state.baseline_synopsis
+                    baseline_vals = st.session_state.baseline_survey_row
+                    gaps = bs['gaps']
+                    if gaps:
+                        st.markdown("#### 🔍 Baseline vs Simulation Comparison (Critical Gaps)")
+                        table_data = []
+                        var_names = {'R':'Readiness (R)','A':'Awareness (A)','C':'Capacity (C)','S':'Structured Support (S)',
+                                     'I':'Institutional Anchoring (I)','P':'Community of Practice (P)','M':'Impact Realization (M)'}
+                        for var in gaps:
+                            base_val = baseline_vals[var]
+                            sim_val = getattr(agent, var)
+                            diff = sim_val - base_val
+                            status = "↑ Improving" if diff > 0.01 else ("↓ Regressing" if diff < -0.01 else "→ Stable")
+                            std_dev = st.session_state.get('baseline_std_devs', {}).get(var, 0.1)
+                            if abs(diff) >= 0.10:
+                                significance = "Both statistically and practically significant"
+                            elif abs(diff) >= 0.5 * std_dev:
+                                significance = "Statistically significant, but limited practical impact"
+                            else:
+                                significance = "Not significant (within normal variability)"
+                            table_data.append({"Critical Gap": var_names[var], "Baseline": f"{base_val:.2f}",
+                                               "Simulation": f"{sim_val:.2f}", "Status": status, "Significance": significance})
+                        st.table(pd.DataFrame(table_data))
+
+                # Division Synopsis (aggregated)
+                total_schools = len(st.session_state.sim.agents)
+                early_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
+                advanced_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
+                transitional_count = total_schools - early_stage_count - advanced_stage_count
+                early_percent = (early_stage_count / total_schools) * 100 if total_schools > 0 else 0
+                advanced_percent = (advanced_stage_count / total_schools) * 100 if total_schools > 0 else 0
+                early_text = f"{early_percent:.1f}% of schools" if early_percent > 0 else "No schools"
+                advanced_text = f"{advanced_percent:.1f}% of schools" if advanced_percent > 0 else "No schools"
+                sustainability_text = ""
+                if early_percent == 100:
+                    sustainability_text = "All schools are in early milestones; foundational capacity‑building is the priority."
+                elif early_percent >= 75:
+                    sustainability_text = f"The vast majority ({early_percent:.1f}%) are in early milestones; urgent interventions needed."
+                elif early_percent >= 50:
+                    sustainability_text = f"More than half ({early_percent:.1f}%) are in early milestones; targeted policy support may accelerate progress."
+                elif early_percent > 0:
+                    sustainability_text = f"{early_percent:.1f}% remain in early milestones; continued efforts are required."
+                else:
+                    sustainability_text = "No schools are in early milestones; the division exhibits a strong, advanced research culture."
+                total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
+                avg_rcsi = total_outcome / total_schools
+                level_avg = "Exceptional"
+                for low,high,lev in [(0.0,0.2,"Very Low"),(0.2,0.4,"Low"),(0.4,0.6,"Moderate"),(0.6,0.8,"High"),(0.8,1.0,"Very High")]:
+                    if low <= avg_rcsi < high:
+                        level_avg = lev
+                        break
+                total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
+                avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
+                avg_milestone_interpretation = interpret_avg_milestone(avg_milestone)
+                school_ids_in_sim = [agent.real_id for agent in st.session_state.sim.agents]
+                div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
+                total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
+                total_research_outputs = len(div_metadata)
+                div_util_rate = (total_utilised / total_research_outputs * 100) if total_research_outputs > 0 else 0
+                div_insights = div_metrics if 'div_metrics' in locals() else {}
+                top_div_teacher = div_insights.get('top_div_teacher', 'N/A')
+                top_div_school = div_insights.get('top_div_school', 'N/A')
+                top_div_outputs = div_insights.get('top_div_outputs', 0)
+                bottleneck_milestone = div_insights.get('bottleneck_milestone', 'N/A')
+                bottleneck_time = div_insights.get('bottleneck_time', 0)
+                output_trend_div = ""
+                if not metadata_df.empty and 'upload_date' in metadata_df.columns:
+                    div_timeline = metadata_df.groupby(metadata_df['upload_date'].dt.to_period('Q')).size()
+                    if len(div_timeline) >= 2:
+                        if div_timeline.iloc[-1] > div_timeline.iloc[-2]:
+                            output_trend_div = "The division's research output is increasing over time."
+                        elif div_timeline.iloc[-1] < div_timeline.iloc[-2]:
+                            output_trend_div = "The division's research output is declining over time."
+                        else:
+                            output_trend_div = "The division's research output has remained stable."
+                        avg_div_output = div_timeline.mean()
+                        output_trend_div += f" On average, the division produces {avg_div_output:.1f} outputs per quarter."
+                    else:
+                        output_trend_div = "Division output trend data is limited."
+                milestone_map_full = {'M0':'Milestone 0 (Readiness and Relevance)','M1':'Milestone 1 (Awareness to Action)',
+                                      'M2':'Milestone 2 (Capacity Spark)','M3':'Milestone 3 (Structured Support)',
+                                      'M4':'Milestone 4 (Institutional Anchoring)','M5':'Milestone 5 (Community of Practice)',
+                                      'M6':'Milestone 6 (Impact Realization)'}
+                full_bottleneck = milestone_map_full.get(bottleneck_milestone, bottleneck_milestone)
+                bottleneck_insight = f"Schools spend the most time on average in {full_bottleneck} ({bottleneck_time:.1f} months). This is the critical bottleneck." if bottleneck_milestone != "N/A" else ""
+                top_teacher_insight = f"The division's top researcher is {top_div_teacher} from {top_div_school} with {top_div_outputs} outputs." if top_div_teacher != "N/A" else ""
+                division_synopsis = f"""
+                <div style="background-color: {'#2E2E2E' if dark_mode else '#E8F5E9'}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {DARK_TEXT if dark_mode else 'inherit'};">
+                <b>🏢 Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
+                • Average milestone = {avg_milestone:.1f} → {avg_milestone_interpretation}<br>
+                • Total completed cycles = {total_cycles}<br>
+                • Average RCSI = <b>{avg_rcsi:.3f}</b> → <b>{level_avg}</b> level.<br>
+                • Average research utilisation rate = <b>{div_util_rate:.1f}%</b>.<br>
+                • Stage distribution: {early_text} are in early stages (M≤2), {transitional_percent:.1f}% transitional (M3), and {advanced_text} are advanced (M≥4).<br>
+                <i>Division‑wide sustainability assessment:</i> {sustainability_text}<br><br>
+                📊 <b>Productivity:</b> {output_trend_div}<br>
+                ⏱️ <b>Bottleneck:</b> {bottleneck_insight}<br>
+                🏆 <b>Top Division Researcher:</b> {top_teacher_insight}
+                </div>
+                """
+                st.markdown(division_synopsis, unsafe_allow_html=True)
+
+                with st.expander("📊 Graph Interpretations"):
+                    st.markdown("""
+                    - **Variable Evolution:** Shows how R, A, C, S, I, P, M change over time. Higher values (closer to 1) mean stronger readiness, awareness, capacity, etc.
+                    - **Milestone Progress:** The school moves through milestones 0–6. Reaching milestone 6 and cycling back indicates a full sustainable cycle.
+                    - **Research Culture Sustainability Index (RCSI):** Cumulative strength of the research ecosystem, derived from Impact Realization (M) and Collaboration (P).
+                    - **Improvement per Completed Cycle:** Each bar shows the RCSI contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
+                    - **Radar Chart:** Current snapshot of the seven milestone‑linked variables – the ideal is a balanced, high‑value shape.
+                    - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, experience vs output, timeline, top teachers, and breakdown by rank and attainment.
+                    - **Division‑Level Analysis:** Milestone transition bottlenecks and teacher leaderboard.
+                    - **Comparative Analysis:** Overlay multiple schools' RCSI and milestone progress.
+                    - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
+                    """)
+
+            # Export button
+            if export_btn:
+                all_data = []
+                for agent in st.session_state.sim.agents:
+                    h = st.session_state.history[agent.real_id]
+                    for t in range(len(h['month'])):
+                        row = {'school_id': agent.real_id, 'month': h['month'][t], 'milestone': h['milestone'][t], 'running_outcome': h['running_outcome'][t]}
+                        for var in ['R','A','C','S','I','P','M']:
+                            row[var] = h[var][t]
+                        all_data.append(row)
+                df_hist = pd.DataFrame(all_data)
+                cycle_records = []
+                for agent in st.session_state.sim.agents:
+                    for rec in agent.cycle_improvements:
+                        cycle_records.append({'school_id': agent.real_id, 'cycle_number': rec.cycle_number,
+                                              'total_improvement': rec.total_improvement, 'completion_month': rec.completion_month})
+                df_cycles = pd.DataFrame(cycle_records)
+                st.download_button("Download simulation history", df_hist.to_csv(index=False).encode('utf-8'), "simulation_history.csv", "text/csv")
+                st.download_button("Download cycle improvements", df_cycles.to_csv(index=False).encode('utf-8'), "cycle_improvements.csv", "text/csv")
 else:
     st.info("Please upload quarterly survey and research metadata CSV files to begin.")
