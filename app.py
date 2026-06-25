@@ -1129,7 +1129,8 @@ if survey_file is not None and metadata_file is not None:
                         mc_data = st.session_state.mc_data; fig_mc = plot_monte_carlo_bands(mc_data, dark_mode)
                         st.plotly_chart(fig_mc, use_container_width=True)
                         st.caption(f"Shaded area: P10‑P90 range over {mc_runs} simulations.")
-                        if st.session_state.get('mc_info'): st.markdown(st.session_state.mc_info)
+                        if st.session_state.get('mc_info'):
+                           st.markdown(st.session_state.mc_info)
                         if 'baseline_synopsis' in st.session_state:
                             baseline_vals = st.session_state.baseline_synopsis['values']
                             causal_coeffs = causal_analysis(mc_data['final_rcsi'], baseline_vals)
@@ -1137,7 +1138,16 @@ if survey_file is not None and metadata_file is not None:
                                 st.markdown("**Causal Impact (increase final RCSI per unit increase in baseline variable):**")
                                 df_causal = pd.DataFrame(list(causal_coeffs.items()), columns=['Variable', 'Impact'])
                                 st.dataframe(df_causal)
-                            else: st.info("Not enough Monte Carlo runs for causal analysis (need >10).")
+                                # ------- NEW lines below -------
+                                top_var = max(causal_coeffs, key=causal_coeffs.get)
+                                st.session_state.causal_insight = (
+                                    f"Causal analysis indicates that improving **{VAR_FULL_NAMES.get(top_var, top_var)}** "
+                                    f"has the largest expected impact on final RCSI. Focusing interventions here may yield the greatest benefit."
+                             )
+                             # --------------------------------
+                         else:
+                             st.session_state.causal_insight = ""   # <-- NEW
+                             st.info("Not enough Monte Carlo runs for causal analysis (need >10).")
 
                 # School-Level Synopsis
                 rcsi_val = agent.running_total_outcome; rcsi_level = classify_rcsi(rcsi_val)
@@ -1159,6 +1169,9 @@ if survey_file is not None and metadata_file is not None:
                 …
                {sens_text}
                {mc_text}
+               sens_text = sensitivity_info if sensitivity_info e lse ""
+               mc_text = st.session_state.get('mc_info', "")
+               causal_text = st.session_state.get('causal_insight', "")   # <-- NEW
                {corr_insight}
                Overall, the school is on a path toward research culture sustainability…
                """
@@ -1171,6 +1184,7 @@ if survey_file is not None and metadata_file is not None:
                 This combination suggests that {milestone_progress}
                 {sens_text}
                 {mc_text}
+                {causal_text}
                 Overall, the school is on a path toward research culture sustainability, but further policy support may be needed.
                 """
                 st.markdown(f"""
