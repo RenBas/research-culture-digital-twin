@@ -1062,7 +1062,7 @@ if survey_file is not None and metadata_file is not None:
             st.rerun()
 
         # Display Simulation Results
-        if st.session_state.total_months > 0:
+                if st.session_state.total_months > 0:
             text_col = DARK_TEXT if dark_mode else LIGHT_TEXT
             st.markdown("<h2 style='text-align: center;'>Simulated Data</h2>", unsafe_allow_html=True)
             st.markdown("---")
@@ -1073,11 +1073,285 @@ if survey_file is not None and metadata_file is not None:
                                                                      "Research Culture Sustainability Index (RCSI)",
                                                                      "Improvement per Completed Cycle"))
                 for i, var in enumerate(VARIABLES):
-                    fig1.add_trace(go.Scatter(x=hist['month'], y=hist[var], mode='lines', name=var, line=dict(color=VAR_COLORS[i])), row=1, col=1)
-                fig1.add_trace(go.Scatter(x=hist['month'], y=hist['milestone'], mode='lines', name='Milestone', line=dict(color=DEPED_RED, width=3)), row=1, col=2)
-                fig1.add_trace(go.Scatter(x=hist['month'], y=hist['running_outcome'], mode='lines', name='RCSI', line=dict(color=USTP_GOLD, width=3)), row=2, col=1)
+                    fig1.add_trace(go.Scatter(x=hist['month'], y=hist[var], mode='lines', name=var,
+                                              line=dict(color=VAR_COLORS[i])), row=1, col=1)
+                fig1.add_trace(go.Scatter(x=hist['month'], y=hist['milestone'], mode='lines', name='Milestone',
+                                          line=dict(color=DEPED_RED, width=3)), row=1, col=2)
+                fig1.add_trace(go.Scatter(x=hist['month'], y=hist['running_outcome'], mode='lines', name='RCSI',
+                                          line=dict(color=USTP_GOLD, width=3)), row=2, col=1)
                 if agent.cycle_improvements:
-                    fig1.add_trace(go.Bar(x=[c.cycle_number for c in agent.cycle_improvements], y=[c.total_improvement for c in agent.cycle_improvements], name='RCSI per cycle', marker_color=USTP_DARK_BLUE), row=2, col=2)
+                    fig1.add_trace(go.Bar(x=[c.cycle_number for c in agent.cycle_improvements],
+                                          y=[c.total_improvement for c in agent.cycle_improvements],
+                                          name='RCSI per cycle', marker_color=USTP_DARK_BLUE), row=2, col=2)
+                else:
+                    fig1.add_annotation(text="No cycles completed yet", xref="x2 domain", yref="y2 domain",
+                                        x=0.5, y=0.5, showarrow=False, row=2, col=2)
+
+                fig1.update_xaxes(title_text="Month", row=1, col=1, title_font=dict(color=text_col, size=14))
+                fig1.update_yaxes(title_text="Value (0-1)", row=1, col=1, title_font=dict(color=text_col, size=14))
+                fig1.update_xaxes(title_text="Month", row=1, col=2, title_font=dict(color=text_col, size=14))
+                fig1.update_yaxes(title_text="Milestone", row=1, col=2, title_font=dict(color=text_col, size=14))
+                fig1.update_xaxes(title_text="Month", row=2, col=1, title_font=dict(color=text_col, size=14))
+                fig1.update_yaxes(title_text="RCSI", row=2, col=1, title_font=dict(color=text_col, size=14))
+                fig1.update_xaxes(title_text="Cycle Number", row=2, col=2, title_font=dict(color=text_col, size=14))
+                fig1.update_yaxes(title_text="RCSI", row=2, col=2, title_font=dict(color=text_col, size=14))
+
+                template = 'plotly_dark' if dark_mode else 'plotly_white'
+                fig1.update_layout(height=800, showlegend=True, font=dict(color=text_col), template=template)
+                st.plotly_chart(fig1, use_container_width=True)
+                get_figure_download_link(fig1, "simulation_overview.html", "Download Simulation Charts")
+
+                # RCSI Interpretation Table
+                st.markdown("### RCSI Interpretation Table")
+                st.markdown("""
+                | RCSI Range | Level | Description |
+                |------------|-------|-------------|
+                | 0.0 – 0.2 | Very Low | Little to no accumulated research culture strength. |
+                | 0.2 – 0.4 | Low | Minimal ecosystem vitality; research culture still weak. |
+                | 0.4 – 0.6 | Moderate | Noticeable strength; research culture developing. |
+                | 0.6 – 0.8 | High | Strong ecosystem; research culture becoming sustainable. |
+                | 0.8 – 1.0 | Very High | Excellent vitality; research culture fully embedded. |
+                """)
+
+                with st.expander("Cycle vs Research Outputs"):
+                    cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
+
+                with st.expander("Division-Level Analysis"):
+                    div_metrics = division_level_analysis(metadata_df, st.session_state.history,
+                                                          st.session_state.sim.agents, dark_mode)
+
+                with st.expander("Comparative School Analysis"):
+                    all_schools = school_info['school_id_no'].tolist()
+                    selected_comparison = st.multiselect("Select schools to compare", options=all_schools,
+                                                         format_func=lambda x: id_to_label.get(x, f"ID {x}"),
+                                                         key="comp_selector")
+                    school_comparison_dashboard(survey_df, st.session_state.history, school_info,
+                                                selected_comparison, dark_mode)
+
+                # Sensitivity Analysis
+                sensitivity_info = ""
+                if not st.session_state.get('sensitivity_fig'):
+                    with st.spinner("Computing sensitivity analysis..."):
+                        fig_tornado, sensitivity_info = run_sensitivity(Simulation, agent_params, school_ids, levers,
+                                                                        duration, use_survey, survey_df, metadata_df,
+                                                                        selected_school_id)
+                        st.session_state.sensitivity_fig = fig_tornado
+                        st.session_state.sensitivity_info = sensitivity_info
+                else:
+                    fig_tornado = st.session_state.sensitivity_fig
+                    sensitivity_info = st.session_state.sensitivity_info
+
+                with st.expander("Sensitivity Analysis (Tornado)"):
+                    st.plotly_chart(fig_tornado, use_container_width=True)
+                    st.caption("Each lever varied ±10% while others fixed at current slider values.")
+                    if sensitivity_info:
+                        st.markdown(sensitivity_info)
+
+                # Monte Carlo expander – fully corrected block
+                if 'mc_data' in st.session_state:
+                    with st.expander("Monte Carlo Uncertainty Bands"):
+                        mc_data = st.session_state.mc_data
+                        fig_mc = plot_monte_carlo_bands(mc_data, dark_mode)
+                        st.plotly_chart(fig_mc, use_container_width=True)
+                        st.caption(f"Shaded area: P10‑P90 range over {mc_runs} simulations.")
+                        if st.session_state.get('mc_info'):
+                            st.markdown(st.session_state.mc_info)
+                        if 'baseline_synopsis' in st.session_state:
+                            baseline_vals = st.session_state.baseline_synopsis['values']
+                            causal_coeffs = causal_analysis(mc_data['final_rcsi'], baseline_vals)
+                            if causal_coeffs:
+                                st.markdown("**Causal Impact (increase final RCSI per unit increase in baseline variable):**")
+                                df_causal = pd.DataFrame(list(causal_coeffs.items()), columns=['Variable', 'Impact'])
+                                st.dataframe(df_causal)
+                                top_var = max(causal_coeffs, key=causal_coeffs.get)
+                                st.session_state.causal_insight = (
+                                    f"Causal analysis indicates that improving **{VAR_FULL_NAMES.get(top_var, top_var)}** "
+                                    f"has the largest expected impact on final RCSI. Focusing interventions here may yield the greatest benefit."
+                                )
+                            else:
+                                st.session_state.causal_insight = ""
+                                st.info("Not enough Monte Carlo runs for causal analysis (need >10).")
+
+                # School-Level Synopsis
+                rcsi_val = agent.running_total_outcome
+                rcsi_level = classify_rcsi(rcsi_val)
+                milestone_name = MILESTONE_NAMES.get(agent.current_milestone, f"Milestone {agent.current_milestone}")
+                if agent.cycle_count >= 2:
+                    cycle_text = f"has completed {agent.cycle_count} full cycles, indicating a self-sustaining research culture."
+                elif agent.cycle_count == 1:
+                    cycle_text = "has completed one full cycle, demonstrating initial sustainability."
+                else:
+                    cycle_text = "has not yet completed any full cycle."
+                if agent.current_milestone == 0:
+                    milestone_progress = "is at the very beginning of the journey."
+                elif agent.current_milestone <= 2:
+                    milestone_progress = "has moved beyond initial readiness but remains in early capacity‑building phases."
+                elif agent.current_milestone <= 4:
+                    milestone_progress = "has established structured support and is embedding research into institutional practice."
+                else:
+                    milestone_progress = "is realising tangible impact and is approaching or has achieved cyclical sustainability."
+                key_R = hist['R'][-1] if hist['R'] else 0
+                key_M = hist['M'][-1] if hist['M'] else 0
+
+                sens_text = sensitivity_info if sensitivity_info else ""
+                mc_text = st.session_state.get('mc_info', "")
+                causal_text = st.session_state.get('causal_insight', "")
+
+                bg_col = '#2E2E2E' if dark_mode else '#E3F2FD'
+                synopsis = f"""
+                After {st.session_state.total_months} months, {selected_school_name} (ID {selected_school_id}) has reached {milestone_name} and {cycle_text}
+                The school's RCSI is <b>{rcsi_val:.3f}</b>, which falls into the <b>{rcsi_level}</b> level.
+                Key indicators: Readiness (R) = {key_R:.2f}, Impact (M) = {key_M:.2f}, and current Milestone = {agent.current_milestone}.
+                This combination suggests that {milestone_progress}
+                {sens_text}
+                {mc_text}
+                {causal_text}
+                Overall, the school is on a path toward research culture sustainability, but further policy support may be needed.
+                """
+                st.markdown(f"""
+                <div style="background-color: {bg_col}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
+                <b>School {selected_school_id} ({selected_school_name}) – Simulation Synopsis</b><br>
+                {synopsis}
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Baseline vs Simulation gaps table
+                if ('baseline_synopsis' in st.session_state and 'baseline_survey_row' in st.session_state):
+                    bs = st.session_state.baseline_synopsis
+                    baseline_vals = st.session_state.baseline_survey_row
+                    gaps = bs['gaps']
+                    if gaps:
+                        st.markdown("#### Baseline vs Simulation Comparison (Critical Gaps)")
+                        table_data = []
+                        baseline_std_devs = st.session_state.get('baseline_std_devs', {})
+                        for var in gaps:
+                            base_val = baseline_vals[var]
+                            sim_val = getattr(agent, var)
+                            diff = sim_val - base_val
+                            status = "Improving" if diff > 0.01 else ("Regressing" if diff < -0.01 else "Stable")
+                            std_dev = baseline_std_devs.get(var, 0.1)
+                            if abs(diff) >= 0.10:
+                                significance = "Both statistically and practically significant"
+                            elif abs(diff) >= 0.5 * std_dev:
+                                significance = "Statistically significant, but limited practical impact"
+                            else:
+                                significance = "Not significant (within normal variability)"
+                            table_data.append({
+                                "Critical Gap": VAR_FULL_NAMES[var],
+                                "Baseline": f"{base_val:.2f}",
+                                "Simulation": f"{sim_val:.2f}",
+                                "Status": status,
+                                "Significance": significance
+                            })
+                        st.table(pd.DataFrame(table_data))
+
+                # Division-Level Synopsis
+                total_schools = len(st.session_state.sim.agents)
+                early_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
+                advanced_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
+                transitional = total_schools - early_stage - advanced_stage
+                early_percent = (early_stage / total_schools * 100) if total_schools > 0 else 0
+                advanced_percent = (advanced_stage / total_schools * 100) if total_schools > 0 else 0
+                transitional_percent = (transitional / total_schools * 100) if total_schools > 0 else 0
+                early_text = f"{early_percent:.1f}% of schools" if early_percent > 0 else "No schools"
+                advanced_text = f"{advanced_percent:.1f}% of schools" if advanced_percent > 0 else "No schools"
+                if early_percent == 100:
+                    sustainability_text = "All schools are in early milestones; foundational capacity‑building is the priority."
+                elif early_percent >= 75:
+                    sustainability_text = f"The vast majority ({early_percent:.1f}%) are in early milestones; urgent interventions needed."
+                elif early_percent >= 50:
+                    sustainability_text = f"More than half ({early_percent:.1f}%) are in early milestones; targeted policy support may accelerate progress."
+                elif early_percent > 0:
+                    sustainability_text = f"{early_percent:.1f}% remain in early milestones; continued efforts are required."
+                else:
+                    sustainability_text = "No schools are in early milestones; the division exhibits a strong, advanced research culture."
+
+                total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
+                avg_rcsi = total_outcome / total_schools if total_schools > 0 else 0
+                level_avg = classify_rcsi(avg_rcsi)
+                total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
+                avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
+                avg_milestone_interp = interpret_avg_milestone(avg_milestone)
+
+                school_ids_in_sim = [a.real_id for a in st.session_state.sim.agents]
+                div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
+                total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
+                total_research = len(div_metadata)
+                div_util_rate = (total_utilised / total_research * 100) if total_research > 0 else 0
+
+                top_div_teacher = div_metrics.get('top_div_teacher', 'N/A')
+                top_div_school = div_metrics.get('top_div_school', 'N/A')
+                top_div_outputs = div_metrics.get('top_div_outputs', 0)
+                bottleneck_milestone = div_metrics.get('bottleneck_milestone', 'N/A')
+                bottleneck_time = div_metrics.get('bottleneck_time', 0)
+
+                output_trend_div = ""
+                if not metadata_df.empty and 'upload_date' in metadata_df.columns:
+                    div_timeline = metadata_df.groupby(metadata_df['upload_date'].dt.to_period('Q')).size()
+                    if len(div_timeline) >= 2:
+                        if div_timeline.iloc[-1] > div_timeline.iloc[-2]:
+                            output_trend_div = "The division's research output is increasing over time."
+                        elif div_timeline.iloc[-1] < div_timeline.iloc[-2]:
+                            output_trend_div = "The division's research output is declining over time."
+                        else:
+                            output_trend_div = "The division's research output has remained stable."
+                        avg_div_output = div_timeline.mean()
+                        output_trend_div += f" On average, the division produces {avg_div_output:.1f} outputs per quarter."
+
+                full_bottleneck = MILESTONE_NAMES.get(int(bottleneck_milestone.replace('M', '')) if isinstance(bottleneck_milestone, str) and bottleneck_milestone.startswith('M') else 0, bottleneck_milestone)
+                bottleneck_insight = f"Schools spend the most time on average in {full_bottleneck} ({bottleneck_time:.1f} months). This is the critical bottleneck." if bottleneck_milestone != "N/A" else ""
+                top_teacher_insight = f"The division's top researcher is {top_div_teacher} from {top_div_school} with {top_div_outputs} outputs." if top_div_teacher != "N/A" else ""
+
+                bg_div = '#2E2E2E' if dark_mode else '#E8F5E9'
+                st.markdown(f"""
+                <div style="background-color: {bg_div}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
+                <b>Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
+                - Average milestone = {avg_milestone:.1f} → {avg_milestone_interp}<br>
+                - Total completed cycles = {total_cycles}<br>
+                - Average RCSI = <b>{avg_rcsi:.3f}</b> → <b>{level_avg}</b> level.<br>
+                - Average research utilisation rate = <b>{div_util_rate:.1f}%</b>.<br>
+                - Stage distribution: {early_text} are in early stages (M≤2), {transitional_percent:.1f}% transitional (M3), and {advanced_text} are advanced (M≥4).<br>
+                <i>Division‑wide sustainability assessment:</i> {sustainability_text}<br><br>
+                <b>Productivity:</b> {output_trend_div}<br>
+                <b>Bottleneck:</b> {bottleneck_insight}<br>
+                <b>Top Division Researcher:</b> {top_teacher_insight}
+                </div>
+                """, unsafe_allow_html=True)
+
+                with st.expander("Graph Interpretations"):
+                    st.markdown("""
+                    - **Variable Evolution:** How R, A, C, S, I, P, M change over time. Higher values (closer to 1) mean stronger readiness, awareness, capacity, etc.
+                    - **Milestone Progress:** The school moves through milestones 0-6. Reaching milestone 6 and cycling back indicates a full sustainable cycle.
+                    - **RCSI:** Cumulative strength of the research ecosystem, derived from Impact Realization (M) and Collaboration (P).
+                    - **Improvement per Cycle:** Each bar shows the RCSI contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
+                    - **Radar Chart:** Current snapshot of the seven milestone-linked variables.
+                    - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, experience vs output, timeline, top teachers, and breakdown by rank and attainment.
+                    - **Sensitivity Tornado:** Shows which policy lever most influences the final RCSI when varied ±10%.
+                    - **Monte Carlo Bands:** Depicts the uncertainty range (P10‑P90) of RCSI and milestone trajectories over multiple simulation runs.
+                    - **Division‑Level Analysis:** Milestone transition bottlenecks and teacher leaderboard.
+                    - **Comparative Analysis:** Overlay multiple schools' RCSI and milestone progress.
+                    - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
+                    """)
+
+            # Export button
+            if export_btn:
+                all_data = []
+                for a in st.session_state.sim.agents:
+                    h = st.session_state.history[a.real_id]
+                    for t in range(len(h['month'])):
+                        row = {'school_id': a.real_id, 'month': h['month'][t], 'milestone': h['milestone'][t], 'running_outcome': h['running_outcome'][t]}
+                        for v in VARIABLES:
+                            row[v] = h[v][t]
+                        all_data.append(row)
+                df_hist = pd.DataFrame(all_data)
+                cycle_records = []
+                for a in st.session_state.sim.agents:
+                    for rec in a.cycle_improvements:
+                        cycle_records.append({'school_id': a.real_id, 'cycle_number': rec.cycle_number,
+                                              'total_improvement': rec.total_improvement, 'completion_month': rec.completion_month})
+                df_cycles = pd.DataFrame(cycle_records)
+                st.download_button("Download simulation history", df_hist.to_csv(index=False).encode('utf-8'), "simulation_history.csv", "text/csv")
+                st.download_button("Download cycle improvements", df_cycles.to_csv(index=False).encode('utf-8'), "cycle_improvements.csv", "text/csv")
                 else: fig1.add_annotation(text="No cycles completed yet", xref="x2 domain", yref="y2 domain", x=0.5, y=0.5, showarrow=False, row=2, col=2)
                 template = 'plotly_dark' if dark_mode else 'plotly_white'
                 fig1.update_layout(height=800, showlegend=True, font=dict(color=text_col), template=template)
