@@ -355,7 +355,54 @@ def get_latest_survey(survey_df, school_id):
         return None
     return school_data.sort_values('month_num').iloc[-1]
 
-# ---------- PHASE 1: Cached chart functions ----------
+# ---------- Circular arrow helper (NEW) ----------
+def add_circular_arrow(fig, cx=0.5, cy=0.5, radius=0.48, start_deg=0, end_deg=350, arrow_length=0.04, arrow_width=0.02):
+    """
+    Add a clockwise circular arrow around the radar using paper coordinates.
+    The arrow arc and arrowhead are drawn as Plotly shapes.
+    """
+    def deg_to_xy(deg):
+        rad = math.radians(deg)
+        x = cx + radius * math.sin(rad)
+        y = cy - radius * math.cos(rad)
+        return x, y
+
+    # Arc path (clockwise)
+    x_start, y_start = deg_to_xy(start_deg)
+    x_end, y_end = deg_to_xy(end_deg)
+    arc_path = f"M {x_start:.4f},{y_start:.4f} A {radius:.4f},{radius:.4f} 0 1 1 {x_end:.4f},{y_end:.4f}"
+    fig.add_shape(
+        type="path",
+        path=arc_path,
+        line=dict(color=USTP_GOLD, width=2),
+        xref="paper", yref="paper"
+    )
+
+    # Arrowhead (triangle) at end
+    rad_end = math.radians(end_deg)
+    rx = x_end - cx
+    ry = y_end - cy
+    # Clockwise tangent in paper coordinates (y down): (-ry, rx)
+    tx = -ry
+    ty = rx
+    norm = math.hypot(tx, ty)
+    tx /= norm
+    ty /= norm
+    tip_x, tip_y = x_end, y_end
+    bx = tip_x - arrow_length * tx
+    by = tip_y - arrow_length * ty
+    px = -ty * arrow_width
+    py = tx * arrow_width
+    path_head = f"M {tip_x:.4f},{tip_y:.4f} L {bx+px:.4f},{by+py:.4f} L {bx-px:.4f},{by-py:.4f} Z"
+    fig.add_shape(
+        type="path",
+        path=path_head,
+        fillcolor=USTP_GOLD,
+        line=dict(color=USTP_GOLD),
+        xref="paper", yref="paper"
+    )
+
+# ---------- PHASE 1: Cached radar chart (NOW WITH ARROW) ----------
 @st.cache_data(show_spinner=False)
 def build_radar_chart(survey_values_tuple, school_name, dark_mode):
     """Cacheable radar chart builder. survey_values_tuple = (R, A, C, S, I, P, M)"""
@@ -395,6 +442,8 @@ def build_radar_chart(survey_values_tuple, school_name, dark_mode):
         ],
         height=500, margin=dict(l=60, r=80, t=80, b=100)
     )
+    # Add the explicit clockwise arrow that wraps around the radar
+    add_circular_arrow(fig)
     return fig
 
 # ---------- Helper for utilisation rate interpretation ----------
@@ -672,7 +721,7 @@ def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     elif len(cumulative_outputs) == 1:
         st.caption("📝 First cycle completed. Continued output needed.")
 
-# ---------- Division‑Level Analysis (unchanged) ----------
+# ---------- Division‑Level Analysis ----------
 def division_level_analysis(survey_df, metadata_df, history_per_school, sim_agents, dark_mode):
     st.markdown("### 🔍 Division‑Level Analysis")
 
@@ -924,7 +973,7 @@ if survey_file is not None and metadata_file is not None:
         else:
             st.info("No research outputs for this school.")
 
-        # Radar chart with cached figure + download
+        # Radar chart (with arrow) + download
         latest = get_latest_survey(survey_df, selected_school_id)
         if latest is not None:
             col_left, col_right = st.columns([1, 5])
@@ -945,7 +994,7 @@ if survey_file is not None and metadata_file is not None:
                 radar_fig = build_radar_chart(survey_tuple, selected_school_name, dark_mode)
                 st.plotly_chart(radar_fig, use_container_width=True)
                 get_figure_download_link(radar_fig, "radar_chart.html", "📥 Download Radar Chart")
-                st.caption("📌 The distance from the centre (0) to each milestone point represents the strength of that milestone.")
+                st.caption("📌 The distance from the centre (0) to each milestone point represents the strength of that milestone. The golden arrow indicates the clockwise milestone cycle direction.")
         else:
             st.info("No survey data for current quarter.")
 
@@ -993,7 +1042,7 @@ if survey_file is not None and metadata_file is not None:
         # Baseline Heatmap
         baseline_heatmap(survey_df, metadata_df, dark_mode)
 
-        # Initialize simulation (only if needed)
+        # Initialize simulation (if not already)
         if 'sim' not in st.session_state:
             st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
             st.session_state.current_month = 0
@@ -1009,7 +1058,7 @@ if survey_file is not None and metadata_file is not None:
                 agent.C = min(1.0, agent.C + len(sm[sm['document_type']=='full_paper'])*0.005)
                 agent.P = min(1.0, agent.P + sm['theme'].nunique()*0.01)
 
-        # Run / Step / Reset buttons (using vectorized step)
+        # Run / Step / Reset buttons
         if run_btn:
             st.session_state.sim = Simulation(num_schools=actual_count, random_events=random_events)
             for idx, agent in enumerate(st.session_state.sim.agents):
@@ -1077,7 +1126,7 @@ if survey_file is not None and metadata_file is not None:
             st.session_state.history = {sid: {'R':[],'A':[],'C':[],'S':[],'I':[],'P':[],'M':[],'month':[],'milestone':[],'running_outcome':[]} for sid in school_ids}
             st.rerun()
 
-        # Simulation results display (only if simulation has run)
+        # Display simulation results (only if simulation has run)
         if st.session_state.total_months > 0:
             st.markdown("<h2 style='text-align: center;'>⚙️ Simulated Data</h2>", unsafe_allow_html=True)
             st.markdown("---")
@@ -1111,15 +1160,12 @@ if survey_file is not None and metadata_file is not None:
                 st.plotly_chart(fig1, use_container_width=True)
                 get_figure_download_link(fig1, "simulation_overview.html", "📥 Download Simulation Charts")
 
-                # Cycle vs Research Outputs
                 with st.expander("🔄 Cycle vs Research Outputs"):
                     cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
 
-                # Division‑Level Analysis
                 with st.expander("🏢 Division‑Level Analysis"):
                     div_metrics = division_level_analysis(survey_df, metadata_df, st.session_state.history, st.session_state.sim.agents, dark_mode)
 
-                # Comparative School Analysis
                 with st.expander("📊 Comparative School Analysis"):
                     all_schools = school_info['school_id_no'].tolist()
                     selected_comparison = st.multiselect(
@@ -1142,11 +1188,7 @@ if survey_file is not None and metadata_file is not None:
                 | 0.8 – 1.0 | Very High | Excellent vitality; research culture fully embedded. |
                 """)
 
-                # Simulation Synopsis (same logic as original, just keep)
-                # ... (the rest of the synopsis code unchanged)
-                # I'll include the synopsis generation, but note it's long; I'll keep it as is.
-                # (I'll copy the synopsis code from the original, but since it's unchanged, it's omitted here for brevity – it's part of the original script, just after the table.)
-                # Actually, let's include the full synopsis code to be complete.
+                # Simulation Synopsis
                 rcsi_val = agent.running_total_outcome
                 rcsi_level = "Exceptional"
                 for low, high, lev in [(0.0,0.2,"Very Low"), (0.2,0.4,"Low"), (0.4,0.6,"Moderate"), (0.6,0.8,"High"), (0.8,1.0,"Very High")]:
@@ -1174,7 +1216,6 @@ if survey_file is not None and metadata_file is not None:
                     milestone_progress = "is realising tangible impact and is approaching or has achieved cyclical sustainability."
                 key_R = hist['R'][-1] if hist['R'] else 0
                 key_M = hist['M'][-1] if hist['M'] else 0
-                # Additional insights from school_metrics (if computed)
                 school_metrics = dashboard_data['metrics'] if dashboard_data else {}
                 output_trend_text = ""
                 if school_metrics.get('output_timeline') is not None:
@@ -1242,7 +1283,7 @@ if survey_file is not None and metadata_file is not None:
                                                "Simulation": f"{sim_val:.2f}", "Status": status, "Significance": significance})
                         st.table(pd.DataFrame(table_data))
 
-                # Division Synopsis (aggregated)
+                # Division Synopsis
                 total_schools = len(st.session_state.sim.agents)
                 early_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
                 advanced_stage_count = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
@@ -1326,7 +1367,7 @@ if survey_file is not None and metadata_file is not None:
                     - **Milestone Progress:** The school moves through milestones 0–6. Reaching milestone 6 and cycling back indicates a full sustainable cycle.
                     - **Research Culture Sustainability Index (RCSI):** Cumulative strength of the research ecosystem, derived from Impact Realization (M) and Collaboration (P).
                     - **Improvement per Completed Cycle:** Each bar shows the RCSI contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
-                    - **Radar Chart:** Current snapshot of the seven milestone‑linked variables – the ideal is a balanced, high‑value shape.
+                    - **Radar Chart:** Current snapshot of the seven milestone‑linked variables – the golden arrow shows the clockwise milestone cycle direction.
                     - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, experience vs output, timeline, top teachers, and breakdown by rank and attainment.
                     - **Division‑Level Analysis:** Milestone transition bottlenecks and teacher leaderboard.
                     - **Comparative Analysis:** Overlay multiple schools' RCSI and milestone progress.
