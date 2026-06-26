@@ -870,16 +870,17 @@ for key, default in [('max_schools', 200), ('num_schools', 0), ('total_teachers'
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
 
-    # ---------- Role Selector ----------
-    st.session_state.user_role = st.radio(
-        "View as:",
-        options=["Division Head", "School Principal"],
-        index=0 if st.session_state.user_role == "Division Head" else 1,
-        key="role_selector"
-    )
+    # ... user role selector ...
 
     dark_mode = st.checkbox("Dark Mode", value=False)
     apply_theme(dark_mode)
+
+    # ---------- Help / Glossary ----------
+    with st.expander("📖 Glossary / Help", expanded=False):
+        st.markdown("""
+        **RCSI** – Research Culture Sustainability Index.  
+        ...
+        """)
 
     st.metric("Total Schools Loaded", st.session_state.num_schools)
     st.metric("Total Teachers Recorded", st.session_state.total_teachers)
