@@ -1277,49 +1277,77 @@ if survey_file is not None and metadata_file is not None:
 
                 # ---------- Phase 3: Scenario Comparison ----------
                 if st.session_state.saved_scenarios:
-                    with st.expander("📊 Scenario Comparison"):
-                        scenario_names = list(st.session_state.saved_scenarios.keys())
-                        col_sc1, col_sc2 = st.columns(2)
-                        with col_sc1:
-                            sc1 = st.selectbox("First scenario", scenario_names, key="sc1")
-                        with col_sc2:
-                            sc2 = st.selectbox("Second scenario", scenario_names, key="sc2")
-                        if st.button("Compare", key="compare_btn"):
-                            # Helper to run a scenario and extract history
-                            def get_scenario_history(name):
-                                scenario = st.session_state.saved_scenarios[name]
-                                if scenario["history"] is None:
-                                    # Run a fresh simulation with the saved levers
-                                    sim = init_simulation_with_data(school_ids, metadata_df, random_events, agent_params)
-                                    temp_hist = create_empty_history(school_ids)
-                                    for m in range(1, duration+1):
-                                        if use_survey:
-                                            apply_survey_override(sim.agents, survey_df, m)
-                                        sim.step(scenario["levers"], m)
-                                        record_history(temp_hist, sim.agents, m)
-                                    # Extract selected school's history
-                                    h = temp_hist[selected_school_id]
-                                    scenario["history"] = {
-                                        "month": h['month'],
-                                        "running_outcome": h['running_outcome'],
-                                        "milestone": h['milestone']
-                                    }
-                                return scenario["history"]
+    with st.expander("📊 Scenario Comparison"):
+        scenario_names = list(st.session_state.saved_scenarios.keys())
+        col_sc1, col_sc2 = st.columns(2)
+        with col_sc1:
+            sc1 = st.selectbox("First scenario", scenario_names, key="sc1")
+        with col_sc2:
+            sc2 = st.selectbox("Second scenario", scenario_names, key="sc2")
+        if st.button("Compare", key="compare_btn"):
+            # Helper to run a scenario and extract history
+            def get_scenario_history(name):
+                scenario = st.session_state.saved_scenarios[name]
+                if scenario["history"] is None:
+                    sim = init_simulation_with_data(school_ids, metadata_df, random_events, agent_params)
+                    temp_hist = create_empty_history(school_ids)
+                    for m in range(1, duration+1):
+                        if use_survey:
+                            apply_survey_override(sim.agents, survey_df, m)
+                        sim.step(scenario["levers"], m)
+                        record_history(temp_hist, sim.agents, m)
+                    h = temp_hist[selected_school_id]
+                    scenario["history"] = {
+                        "month": h['month'],
+                        "running_outcome": h['running_outcome'],
+                        "milestone": h['milestone']
+                    }
+                return scenario["history"]
 
-                            hist1 = get_scenario_history(sc1)
-                            hist2 = get_scenario_history(sc2)
+            hist1 = get_scenario_history(sc1)
+            hist2 = get_scenario_history(sc2)
 
-                            fig_sc = make_subplots(rows=2, cols=1, subplot_titles=("RCSI Comparison", "Milestone Comparison"))
-                            fig_sc.add_trace(go.Scatter(x=hist1['month'], y=hist1['running_outcome'],
-                                                        mode='lines', name=f"{sc1} RCSI"), row=1, col=1)
-                            fig_sc.add_trace(go.Scatter(x=hist2['month'], y=hist2['running_outcome'],
-                                                        mode='lines', name=f"{sc2} RCSI"), row=1, col=1)
-                            fig_sc.add_trace(go.Scatter(x=hist1['month'], y=hist1['milestone'],
-                                                        mode='lines', name=f"{sc1} Milestone"), row=2, col=1)
-                            fig_sc.add_trace(go.Scatter(x=hist2['month'], y=hist2['milestone'],
-                                                        mode='lines', name=f"{sc2} Milestone"), row=2, col=1)
-                            fig_sc.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
-                            st.plotly_chart(fig_sc, use_container_width=True)
+            fig_sc = make_subplots(rows=2, cols=1, subplot_titles=("RCSI Comparison", "Milestone Comparison"))
+            fig_sc.add_trace(go.Scatter(x=hist1['month'], y=hist1['running_outcome'],
+                                        mode='lines', name=f"{sc1} RCSI"), row=1, col=1)
+            fig_sc.add_trace(go.Scatter(x=hist2['month'], y=hist2['running_outcome'],
+                                        mode='lines', name=f"{sc2} RCSI"), row=1, col=1)
+            fig_sc.add_trace(go.Scatter(x=hist1['month'], y=hist1['milestone'],
+                                        mode='lines', name=f"{sc1} Milestone"), row=2, col=1)
+            fig_sc.add_trace(go.Scatter(x=hist2['month'], y=hist2['milestone'],
+                                        mode='lines', name=f"{sc2} Milestone"), row=2, col=1)
+            # --- Axis labels ---
+            fig_sc.update_xaxes(title_text="Month", row=1, col=1, title_font=dict(color=text_col, size=12))
+            fig_sc.update_yaxes(title_text="RCSI", row=1, col=1, title_font=dict(color=text_col, size=12))
+            fig_sc.update_xaxes(title_text="Month", row=2, col=1, title_font=dict(color=text_col, size=12))
+            fig_sc.update_yaxes(title_text="Milestone", row=2, col=1, title_font=dict(color=text_col, size=12))
+            fig_sc.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
+            st.plotly_chart(fig_sc, use_container_width=True)
+
+            # --- Scenario comparison analysis ---
+            final_rcsi1 = hist1['running_outcome'][-1]
+            final_rcsi2 = hist2['running_outcome'][-1]
+            final_mil1 = hist1['milestone'][-1]
+            final_mil2 = hist2['milestone'][-1]
+            if final_rcsi1 > final_rcsi2:
+                better = sc1
+                worse = sc2
+            else:
+                better = sc2
+                worse = sc1
+            comp_text = (
+                f"**Scenario Comparison Analysis:** After {duration} months, "
+                f"'{better}' yields a higher final RCSI ({max(final_rcsi1, final_rcsi2):.3f} vs {min(final_rcsi1, final_rcsi2):.3f}) "
+                f"and a more advanced milestone (M{final_mil1 if better == sc1 else final_mil2} vs M{final_mil2 if better == sc1 else final_mil1}). "
+                f"This suggests that the policy combination in '{better}' is more effective for this school. "
+                f"Consider adopting these lever settings to accelerate research culture sustainability."
+            )
+            st.markdown(comp_text)
+            # Store in session state for use in synopsis
+            st.session_state.scenario_comparison_text = comp_text
+else:
+    if st.session_state.get('scenario_comparison_text'):
+        st.session_state.scenario_comparison_text = ""
                 else:
                     st.info("No saved scenarios. Use the Scenario Manager in the sidebar to save policy lever combinations.")
 
@@ -1347,6 +1375,7 @@ if survey_file is not None and metadata_file is not None:
                 sens_text = sensitivity_info if sensitivity_info else ""
                 mc_text = st.session_state.get('mc_info', "")
                 causal_text = st.session_state.get('causal_insight', "")
+                scen_comp_text = st.session_state.get('scenario_comparison_text', "")
 
                 bg_col = '#2E2E2E' if dark_mode else '#E3F2FD'
                 synopsis = f"""
@@ -1357,6 +1386,7 @@ if survey_file is not None and metadata_file is not None:
                 {sens_text}
                 {mc_text}
                 {causal_text}
+                {scen_comp_text}
                 Overall, the school is on a path toward research culture sustainability, but further policy support may be needed.
                 """
                 st.markdown(f"""
