@@ -868,7 +868,20 @@ for key, default in [('max_schools', 200), ('num_schools', 0), ('total_teachers'
         st.session_state[key] = default
 
 with st.sidebar:
+    # ---------- User Authentication (coming soon) ----------
+    with st.expander("🔐 User Authentication (coming soon)", expanded=False):
+        st.markdown(
+            "When activated, each user will log in with their own credentials. "
+            "The system will automatically assign the correct role (Division Head or School Principal) "
+            "and restrict data access accordingly."
+        )
+        st.text_input("Username", value="", disabled=True, key="disabled_user")
+        st.text_input("Password", value="", type="password", disabled=True, key="disabled_pass")
+        st.button("Login", disabled=True, key="disabled_login_btn")
+        st.caption("📌 This feature will be enabled when the Twin is ready for secure multi‑user deployment.")
+
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
+
     # ---------- Role Selector ----------
     st.session_state.user_role = st.radio(
         "View as:",
@@ -876,36 +889,21 @@ with st.sidebar:
         index=0 if st.session_state.user_role == "Division Head" else 1,
         key="role_selector"
     )
-    # ... user role selector ...
 
     dark_mode = st.checkbox("Dark Mode", value=False)
     apply_theme(dark_mode)
-
-    # ---------- Help / Glossary ----------
-    with st.expander("📖 Glossary / Help", expanded=False):
-        st.markdown("""
-        **RCSI** – Research Culture Sustainability Index.  
-        A cumulative score that grows each month based on Impact (M) and Collaboration (P).  
-        Higher = better. Classified as Very Low / Low / Moderate / High / Very High.
-
-        **Milestones (M0–M6)** – The seven stages a school passes through:  
-        M0 Readiness → M1 Awareness → M2 Capacity → M3 Support → M4 Institutional → M5 Community → M6 Impact.  
-        Reaching M6 and cycling back means a full sustainable cycle has been completed.
-
-        **Sensitivity Tornado** – Shows how much the final RCSI changes when each policy lever
-        is varied by ±10% while the others stay fixed. The longest bar = most influential lever.
-
-        **Monte Carlo Bands** – Runs the simulation many times with slight random variations and
-        shows the range (P10–P90) of possible outcomes. The shaded band is the uncertainty.
-
-        **Scenario Comparison** – Lets you save different lever combinations and compare
-        their RCSI and milestone trajectories side‑by‑side.
-        """)
 
     st.metric("Total Schools Loaded", st.session_state.num_schools)
     st.metric("Total Teachers Recorded", st.session_state.total_teachers)
     if st.session_state.get('total_months', 0) > 0:
         st.metric("Simulation Month", st.session_state.total_months)
+
+    # ---------- Help / Glossary ----------
+    with st.expander("📖 Glossary / Help", expanded=False):
+        st.markdown("""
+        **RCSI** – Research Culture Sustainability Index.  
+        ...
+        """)
 
     st.markdown("---")
     st.markdown("#### Baseline Analysis")
@@ -922,21 +920,7 @@ with st.sidebar:
         u_lead = st.slider("Leadership commit.", 0.0, 1.0, 0.5, 0.05)
         u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05)
     levers = {'u_train': u_train, 'u_mentor': u_mentor, 'u_budget': u_budget, 'u_lead': u_lead, 'u_collab': u_collab}
-    
-    with st.sidebar:
-        # ---------- User Authentication (coming soon) ----------
-        with st.expander("🔐 User Authentication (coming soon)", expanded=False):
-            st.markdown(
-            "When activated, each user will log in with their own credentials. "
-            "The system will automatically assign the correct role (Division Head or School Principal) "
-            "and restrict data access accordingly."
-            )
-            st.text_input("Username", value="", disabled=True, key="disabled_user")
-            st.text_input("Password", value="", type="password", disabled=True, key="disabled_pass")
-            st.button("Login", disabled=True, key="disabled_login_btn")
-            st.caption("📌 This feature will be enabled when the Twin is ready for secure multi‑user deployment.")
 
-        st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)    
     # ---------- Scenario Manager ----------
     st.markdown("---")
     st.markdown("#### 📁 Scenario Manager")
@@ -958,7 +942,6 @@ with st.sidebar:
             selected_scenario = st.selectbox("Load", scenario_list, key="load_scenario")
             if st.button("🔄 Load", use_container_width=True, key="load_btn"):
                 saved = st.session_state.saved_scenarios[selected_scenario]
-                # Overwrite current levers by storing them for the simulation
                 st.session_state['applied_levers'] = saved["levers"]
                 st.rerun()
         else:
@@ -969,11 +952,13 @@ with st.sidebar:
             if st.button("🗑️ Delete", use_container_width=True, key="del_btn"):
                 del st.session_state.saved_scenarios[del_scenario]
                 st.rerun()
+
     # Reset all scenarios
     if st.session_state.saved_scenarios:
         if st.button("🗑️ Clear All Scenarios", use_container_width=True):
             st.session_state.saved_scenarios = {}
             st.success("All saved scenarios have been cleared.")
+
     # Apply saved levers if loaded
     if 'applied_levers' in st.session_state:
         levers = st.session_state.applied_levers
@@ -1001,7 +986,6 @@ with st.sidebar:
     st.caption("Run: full forecast. Step: one month. Reset: clear history.")
 
     st.markdown("---")
-    # ----- Executive Report Button -----
     if st.button("📄 Download Executive Report", use_container_width=True):
         st.session_state['generate_report'] = True
 
