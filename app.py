@@ -1303,7 +1303,7 @@ if survey_file is not None and metadata_file is not None:
                                 st.session_state.causal_insight = ""
                                 st.info("Not enough Monte Carlo runs for causal analysis (need >10).")
 
-                                               # ---------- Phase 3: Scenario Comparison ----------
+                # ---------- Phase 3: Scenario Comparison ----------
                 if st.session_state.saved_scenarios:
                     with st.expander("📊 Scenario Comparison"):
                         scenario_names = list(st.session_state.saved_scenarios.keys())
@@ -1312,7 +1312,7 @@ if survey_file is not None and metadata_file is not None:
                             sc1 = st.selectbox("First scenario", scenario_names, key="sc1")
                         with col_sc2:
                             sc2 = st.selectbox("Second scenario", scenario_names, key="sc2")
-                         if st.button("Compare", key="compare_btn"):
+                        if st.button("Compare", key="compare_btn"):
                             def get_scenario_history(name):
                                 scenario = st.session_state.saved_scenarios[name]
                                 if scenario["history"] is None:
@@ -1335,7 +1335,6 @@ if survey_file is not None and metadata_file is not None:
                                 hist1 = get_scenario_history(sc1)
                                 hist2 = get_scenario_history(sc2)
 
-                            # --- Chart building (unchanged) ---
                             fig_sc = make_subplots(rows=2, cols=1, subplot_titles=("RCSI Comparison", "Milestone Comparison"))
                             fig_sc.add_trace(go.Scatter(x=hist1['month'], y=hist1['running_outcome'],
                                                         mode='lines', name=f"{sc1} RCSI"), row=1, col=1)
@@ -1390,7 +1389,7 @@ if survey_file is not None and metadata_file is not None:
                 else:
                     st.info("No saved scenarios. Use the Scenario Manager in the sidebar to save policy lever combinations.")
                     st.session_state.scenario_comparison_text = ""
-
+                
                 # ---------- School-Level Synopsis ----------
                 rcsi_val = agent.running_total_outcome
                 rcsi_level = classify_rcsi(rcsi_val)
