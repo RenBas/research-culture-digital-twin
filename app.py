@@ -869,7 +869,13 @@ for key, default in [('max_schools', 200), ('num_schools', 0), ('total_teachers'
 
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
-
+    # ---------- Role Selector ----------
+    st.session_state.user_role = st.radio(
+        "View as:",
+        options=["Division Head", "School Principal"],
+        index=0 if st.session_state.user_role == "Division Head" else 1,
+        key="role_selector"
+    )
     # ... user role selector ...
 
     dark_mode = st.checkbox("Dark Mode", value=False)
@@ -1588,7 +1594,7 @@ if survey_file is not None and metadata_file is not None:
                             radar_fig = build_radar_chart(tuple(latest[v] for v in VARIABLES), selected_school_name, dark_mode)
                             report_html += "<h3>Baseline Research Culture Profile</h3>" + radar_fig.to_html(include_plotlyjs='cdn', full_html=False)
 
-                        # Simulation overview chart (reuse the existing fig1)
+                        # Simulation overview chart
                         report_html += "<h3>Simulation Overview</h3>" + fig1.to_html(include_plotlyjs='cdn', full_html=False)
 
                         # Sensitivity tornado
@@ -1599,14 +1605,102 @@ if survey_file is not None and metadata_file is not None:
                         if 'mc_data' in st.session_state:
                             report_html += "<h3>Monte Carlo Uncertainty</h3>" + plot_monte_carlo_bands(st.session_state.mc_data, dark_mode).to_html(include_plotlyjs='cdn', full_html=False)
 
-                        # Synopsis text
-                        report_html += "<h3>School-Level Synopsis</h3><p>" + synopsis.replace('\n', '<br>') + "</p>"
+                        # School‑level synopsis
+                        report_html += "<h3>School‑Level Synopsis</h3><p>" + synopsis.replace('\n', '<br>') + "</p>"
+
+                        # Scenario comparison chart and analysis (if available)
+                        if st.session_state.get('scenario_comparison_text') and st.session_state.saved_scenarios:
+                            report_html += "<h3>Scenario Comparison</h3>"
+                            report_html += "<p>" + st.session_state.scenario_comparison_text.replace('\n', '<br>') + "</p>"
+                            # Rebuild the comparison chart (we need hist1/hist2; they are not stored, but we can re‑run quickly)
+                            # For simplicity, we'll skip the chart in the report unless we cache it.
+                            # But we can retrieve the last compared scenarios from session state? Not stored.
+                            # Instead, we can add a note that the chart is available in the app.
+                            report_html += "<p><i>The scenario comparison chart can be viewed in the application.</i></p>"
+
+                        # Division‑level synopsis (only if Division Head)
+                        if st.session_state.user_role == "Division Head":
+                            report_html += "<h3>Division‑Level Synopsis</h3>"
+                            # Re‑build division synopsis text (same as the one displayed earlier)
+                            # We'll capture the division synopsis string in a session state variable when it's displayed.
+                            # To keep it simple, we'll reconstruct it here using the same logic.
+                            # We'll use the already computed values from the main block, which are still in scope.
+                            # However, note that the division synopsis is only displayed when role is Division Head, but we can still compute it here.
+                            total_schools = len(st.session_state.sim.agents)
+                            early_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
+                            advanced_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
+                            transitional = total_schools - early_stage - advanced_stage
+                            early_percent = (early_stage / total_schools * 100) if total_schools > 0 else 0
+                            advanced_percent = (advanced_stage / total_schools * 100) if total_schools > 0 else 0
+                            transitional_percent = (transitional / total_schools * 100) if total_schools > 0 else 0
+                            early_text = f"{early_percent:.1f}% of schools" if early_percent > 0 else "No schools"
+                            advanced_text = f"{advanced_percent:.1f}% of schools" if advanced_percent > 0 else "No schools"
+                            if early_percent == 100:
+                                sustainability_text = "All schools are in early milestones; foundational capacity‑building is the priority."
+                            elif early_percent >= 75:
+                                sustainability_text = f"The vast majority ({early_percent:.1f}%) are in early milestones; urgent interventions needed."
+                            elif early_percent >= 50:
+                                sustainability_text = f"More than half ({early_percent:.1f}%) are in early milestones; targeted policy support may accelerate progress."
+                            elif early_percent > 0:
+                                sustainability_text = f"{early_percent:.1f}% remain in early milestones; continued efforts are required."
+                            else:
+                                sustainability_text = "No schools are in early milestones; the division exhibits a strong, advanced research culture."
+
+                            total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
+                            avg_rcsi_div = total_outcome / total_schools if total_schools > 0 else 0
+                            level_avg_div = classify_rcsi(avg_rcsi_div)
+                            total_cycles_div = sum(a.cycle_count for a in st.session_state.sim.agents)
+                            avg_milestone_div = np.mean([a.current_milestone for a in st.session_state.sim.agents])
+                            avg_milestone_interp_div = interpret_avg_milestone(avg_milestone_div)
+
+                            school_ids_in_sim = [a.real_id for a in st.session_state.sim.agents]
+                            div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
+                            total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
+                            total_research = len(div_metadata)
+                            div_util_rate = (total_utilised / total_research * 100) if total_research > 0 else 0
+
+                            top_div_teacher = div_metrics.get('top_div_teacher', 'N/A')
+                            top_div_school = div_metrics.get('top_div_school', 'N/A')
+                            top_div_outputs = div_metrics.get('top_div_outputs', 0)
+                            bottleneck_milestone = div_metrics.get('bottleneck_milestone', 'N/A')
+                            bottleneck_time = div_metrics.get('bottleneck_time', 0)
+
+                            output_trend_div = ""
+                            if not metadata_df.empty and 'upload_date' in metadata_df.columns:
+                                div_timeline = metadata_df.groupby(metadata_df['upload_date'].dt.to_period('Q')).size()
+                                if len(div_timeline) >= 2:
+                                    if div_timeline.iloc[-1] > div_timeline.iloc[-2]:
+                                        output_trend_div = "The division's research output is increasing over time."
+                                    elif div_timeline.iloc[-1] < div_timeline.iloc[-2]:
+                                        output_trend_div = "The division's research output is declining over time."
+                                    else:
+                                        output_trend_div = "The division's research output has remained stable."
+                                    avg_div_output = div_timeline.mean()
+                                    output_trend_div += f" On average, the division produces {avg_div_output:.1f} outputs per quarter."
+
+                            full_bottleneck = MILESTONE_NAMES.get(int(bottleneck_milestone.replace('M', '')) if isinstance(bottleneck_milestone, str) and bottleneck_milestone.startswith('M') else 0, bottleneck_milestone)
+                            bottleneck_insight = f"Schools spend the most time on average in {full_bottleneck} ({bottleneck_time:.1f} months). This is the critical bottleneck." if bottleneck_milestone != "N/A" else ""
+                            top_teacher_insight = f"The division's top researcher is {top_div_teacher} from {top_div_school} with {top_div_outputs} outputs." if top_div_teacher != "N/A" else ""
+
+                            division_synopsis_text = f"""
+                            <b>Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
+                            - Average milestone = {avg_milestone_div:.1f} → {avg_milestone_interp_div}<br>
+                            - Total completed cycles = {total_cycles_div}<br>
+                            - Average RCSI = <b>{avg_rcsi_div:.3f}</b> → <b>{level_avg_div}</b> level.<br>
+                            - Average research utilisation rate = <b>{div_util_rate:.1f}%</b>.<br>
+                            - Stage distribution: {early_text} are in early stages (M≤2), {transitional_percent:.1f}% transitional (M3), and {advanced_text} are advanced (M≥4).<br>
+                            <i>Division‑wide sustainability assessment:</i> {sustainability_text}<br><br>
+                            <b>Productivity:</b> {output_trend_div}<br>
+                            <b>Bottleneck:</b> {bottleneck_insight}<br>
+                            <b>Top Division Researcher:</b> {top_teacher_insight}
+                            """
+                            report_html += division_synopsis_text.replace('\n', '<br>')
 
                         report_html += "</body></html>"
                         b64 = base64.b64encode(report_html.encode()).decode()
                         href = f'<a href="data:text/html;base64,{b64}" download="executive_report.html">📥 Download Executive Report</a>'
                         st.markdown(href, unsafe_allow_html=True)
-
+            
             # Export button (unchanged)
             if export_btn:
                 all_data = []
