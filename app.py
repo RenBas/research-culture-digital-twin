@@ -955,7 +955,11 @@ with st.sidebar:
             if st.button("🗑️ Delete", use_container_width=True, key="del_btn"):
                 del st.session_state.saved_scenarios[del_scenario]
                 st.rerun()
-
+    # Reset all scenarios
+    if st.session_state.saved_scenarios:
+        if st.button("🗑️ Clear All Scenarios", use_container_width=True):
+            st.session_state.saved_scenarios = {}
+            st.success("All saved scenarios have been cleared.")
     # Apply saved levers if loaded
     if 'applied_levers' in st.session_state:
         levers = st.session_state.applied_levers
