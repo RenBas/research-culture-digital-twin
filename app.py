@@ -995,6 +995,34 @@ with st.expander("Step 1: Upload your CSV files", expanded=True):
     with c2:
         st.download_button("Metadata Template", metadata_template, "research_metadata_template.csv", "text/csv")
 
+# ---------- Future Live Data Connection (placeholder) ----------
+with st.expander("🔗 Connect to Live Data (coming soon)", expanded=False):
+    st.markdown(
+        "When activated, the Twin will pull survey and metadata directly from a live data source "
+        "instead of manual CSV uploads. The division leadership will choose the final platform "
+        "(e.g., Google Sheets, PostgreSQL, REST API)."
+    )
+    col_db1, col_db2 = st.columns(2)
+    with col_db1:
+        st.selectbox(
+            "Data source type",
+            options=["Google Sheets", "PostgreSQL", "REST API"],
+            index=0,
+            disabled=True,
+            help="This will be selectable once the live connection is enabled."
+        )
+    with col_db2:
+        st.text_input(
+            "Connection string / URL",
+            value="https://docs.google.com/spreadsheets/d/...",
+            disabled=True,
+            help="Enter the full URL or connection string here (disabled for now)."
+        )
+    st.caption(
+        "📌 For now, please continue using the **manual CSV upload** above. "
+        "This section will become functional as soon as the division finalises its data platform."
+    )
+
 # --- Main Area ---
 if survey_file is not None and metadata_file is not None:
     survey_df_raw = pd.read_csv(survey_file)
