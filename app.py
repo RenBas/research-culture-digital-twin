@@ -1275,7 +1275,7 @@ if survey_file is not None and metadata_file is not None:
                                 st.session_state.causal_insight = ""
                                 st.info("Not enough Monte Carlo runs for causal analysis (need >10).")
 
-                               # ---------- Phase 3: Scenario Comparison ----------
+                                               # ---------- Phase 3: Scenario Comparison ----------
                 if st.session_state.saved_scenarios:
                     with st.expander("📊 Scenario Comparison"):
                         scenario_names = list(st.session_state.saved_scenarios.keys())
@@ -1323,54 +1323,53 @@ if survey_file is not None and metadata_file is not None:
                             fig_sc.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
                             st.plotly_chart(fig_sc, use_container_width=True)
 
-                            # -------------------- Revised Scenario Comparison Analysis --------------------
-final_rcsi1 = hist1['running_outcome'][-1]
-final_rcsi2 = hist2['running_outcome'][-1]
-final_mil1 = hist1['milestone'][-1]
-final_mil2 = hist2['milestone'][-1]
+                            # --- Revised Scenario Comparison Analysis ---
+                            final_rcsi1 = hist1['running_outcome'][-1]
+                            final_rcsi2 = hist2['running_outcome'][-1]
+                            final_mil1 = hist1['milestone'][-1]
+                            final_mil2 = hist2['milestone'][-1]
 
-# Determine which scenario has higher RCSI and which has higher milestone (if any)
-rcsi_better = sc1 if final_rcsi1 > final_rcsi2 else sc2
-rcsi_diff = abs(final_rcsi1 - final_rcsi2)
-rcsi_gap_label = "small" if rcsi_diff < 0.005 else ("moderate" if rcsi_diff < 0.02 else "large")
+                            rcsi_better = sc1 if final_rcsi1 > final_rcsi2 else sc2
+                            rcsi_diff = abs(final_rcsi1 - final_rcsi2)
+                            rcsi_gap_label = "small" if rcsi_diff < 0.005 else ("moderate" if rcsi_diff < 0.02 else "large")
 
-mil_order = sorted([(final_mil1, sc1), (final_mil2, sc2)], key=lambda x: x[0], reverse=True)
-mil_better = mil_order[0][1]
-mil_same = (final_mil1 == final_mil2)
+                            mil_order = sorted([(final_mil1, sc1), (final_mil2, sc2)], key=lambda x: x[0], reverse=True)
+                            mil_better = mil_order[0][1]
+                            mil_same = (final_mil1 == final_mil2)
 
-# Build milestone description
-if mil_same:
-    milestone_wording = f"both scenarios end at the same milestone (M{final_mil1})"
-else:
-    milestone_wording = (f"'{mil_better}' reaches a higher milestone (M{mil_order[0][0]} vs M{mil_order[1][0]})")
+                            if mil_same:
+                                milestone_wording = f"both scenarios end at the same milestone (M{final_mil1})"
+                            else:
+                                milestone_wording = (f"'{mil_better}' reaches a higher milestone (M{mil_order[0][0]} vs M{mil_order[1][0]})")
 
-# Build RCSI description
-if final_rcsi1 == final_rcsi2:
-    rcsi_wording = "final RCSI is identical"
-else:
-    rcsi_wording = (f"'{rcsi_better}' yields a slightly higher final RCSI "
-                    f"({max(final_rcsi1, final_rcsi2):.3f} vs {min(final_rcsi1, final_rcsi2):.3f}, "
-                    f"difference of {rcsi_diff:.3f}, a {rcsi_gap_label} gap)")
+                            if final_rcsi1 == final_rcsi2:
+                                rcsi_wording = "final RCSI is identical"
+                            else:
+                                rcsi_wording = (f"'{rcsi_better}' yields a slightly higher final RCSI "
+                                                f"({max(final_rcsi1, final_rcsi2):.3f} vs {min(final_rcsi1, final_rcsi2):.3f}, "
+                                                f"difference of {rcsi_diff:.3f}, a {rcsi_gap_label} gap)")
 
-# Determine if the higher‑RCSI scenario is also the higher‑milestone scenario
-if rcsi_better == mil_better or mil_same:
-    advantage = "and it holds a comparable or better milestone, suggesting its policy mix is more effective overall."
-else:
-    advantage = (f"but '{mil_better}' achieves a higher milestone, so the trade‑off is nuanced: "
-                 f"'{rcsi_better}' may be generating more cumulative impact despite a slightly lower milestone.")
+                            if rcsi_better == mil_better or mil_same:
+                                advantage = "and it holds a comparable or better milestone, suggesting its policy mix is more effective overall."
+                            else:
+                                advantage = (f"but '{mil_better}' achieves a higher milestone, so the trade‑off is nuanced: "
+                                             f"'{rcsi_better}' may be generating more cumulative impact despite a slightly lower milestone.")
 
-comp_text = (
-    f"**Scenario Comparison Analysis:** After {duration} months, "
-    f"{rcsi_wording}; {milestone_wording}. "
-    f"{advantage}"
-)
+                            comp_text = (
+                                f"**Scenario Comparison Analysis:** After {duration} months, "
+                                f"{rcsi_wording}; {milestone_wording}. "
+                                f"{advantage}"
+                            )
+                            st.markdown(comp_text)
+                            st.session_state.scenario_comparison_text = comp_text
+                else:
+                    st.info("No saved scenarios. Use the Scenario Manager in the sidebar to save policy lever combinations.")
+                    st.session_state.scenario_comparison_text = ""
 
-st.markdown(comp_text)
-st.session_state.scenario_comparison_text = comp_text
-                
-                # ---------- School-Level Synopsis (unchanged, but now includes causal insight) ----------
+                # ---------- School-Level Synopsis ----------
                 rcsi_val = agent.running_total_outcome
                 rcsi_level = classify_rcsi(rcsi_val)
+                # ... (keep the rest of the synopsis code exactly as before, with the {scen_comp_text} insertion)
                 milestone_name = MILESTONE_NAMES.get(agent.current_milestone, f"Milestone {agent.current_milestone}")
                 if agent.cycle_count >= 2:
                     cycle_text = f"has completed {agent.cycle_count} full cycles, indicating a self-sustaining research culture."
