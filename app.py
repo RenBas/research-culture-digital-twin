@@ -1277,6 +1277,7 @@ if survey_file is not None and metadata_file is not None:
 
                 # ---------- Phase 3: Scenario Comparison ----------
                 if st.session_state.saved_scenarios:
+    
     with st.expander("📊 Scenario Comparison"):
         scenario_names = list(st.session_state.saved_scenarios.keys())
         col_sc1, col_sc2 = st.columns(2)
