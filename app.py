@@ -1286,6 +1286,7 @@ if survey_file is not None and metadata_file is not None:
                             sc2 = st.selectbox("Second scenario", scenario_names, key="sc2")
                         if st.button("Compare", key="compare_btn"):
                             # Helper to run a scenario and extract history
+                            
                             def get_scenario_history(name):
                             scenario = st.session_state.saved_scenarios[name]
                             if scenario["history"] is None:
