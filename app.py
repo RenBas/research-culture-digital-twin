@@ -854,11 +854,29 @@ def school_comparison_dashboard(survey_df, history_per_school, school_info, sele
 st.set_page_config(page_title="CDO Research Culture Sustainability Framework", layout="wide")
 st.markdown("<h1 style='text-align: center; color: #0D2B5E;'>CDO Division Research Culture Sustainability Framework</h1>", unsafe_allow_html=True)
 
+# ---------- Phase 3 session state ----------
+if 'saved_scenarios' not in st.session_state:
+    st.session_state.saved_scenarios = {}   # {name: {"levers": dict, "history": optional}}
+if 'selected_scenario_name' not in st.session_state:
+    st.session_state.selected_scenario_name = None
+if 'user_role' not in st.session_state:
+    st.session_state.user_role = "Division Head"
+
 for key, default in [('max_schools', 200), ('num_schools', 0), ('total_teachers', 0)]:
-    if key not in st.session_state: st.session_state[key] = default
+    if key not in st.session_state:
+        st.session_state[key] = default
 
 with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
+
+    # ---------- Role Selector ----------
+    st.session_state.user_role = st.radio(
+        "View as:",
+        options=["Division Head", "School Principal"],
+        index=0 if st.session_state.user_role == "Division Head" else 1,
+        key="role_selector"
+    )
+
     dark_mode = st.checkbox("Dark Mode", value=False)
     apply_theme(dark_mode)
 
@@ -883,6 +901,43 @@ with st.sidebar:
         u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05)
     levers = {'u_train': u_train, 'u_mentor': u_mentor, 'u_budget': u_budget, 'u_lead': u_lead, 'u_collab': u_collab}
 
+    # ---------- Scenario Manager ----------
+    st.markdown("---")
+    st.markdown("#### 📁 Scenario Manager")
+    scenario_name = st.text_input("Scenario name", key="scenario_name_input")
+    col_save, col_load, col_del = st.columns(3)
+    with col_save:
+        if st.button("💾 Save", use_container_width=True):
+            if scenario_name.strip():
+                st.session_state.saved_scenarios[scenario_name.strip()] = {
+                    "levers": copy.deepcopy(levers),
+                    "history": None
+                }
+                st.success(f"Scenario '{scenario_name.strip()}' saved.")
+            else:
+                st.warning("Enter a name.")
+    with col_load:
+        scenario_list = list(st.session_state.saved_scenarios.keys())
+        if scenario_list:
+            selected_scenario = st.selectbox("Load", scenario_list, key="load_scenario")
+            if st.button("🔄 Load", use_container_width=True, key="load_btn"):
+                saved = st.session_state.saved_scenarios[selected_scenario]
+                # Overwrite current levers by storing them for the simulation
+                st.session_state['applied_levers'] = saved["levers"]
+                st.rerun()
+        else:
+            st.caption("No saved scenarios")
+    with col_del:
+        if scenario_list:
+            del_scenario = st.selectbox("Delete", scenario_list, key="del_scenario")
+            if st.button("🗑️ Delete", use_container_width=True, key="del_btn"):
+                del st.session_state.saved_scenarios[del_scenario]
+                st.rerun()
+
+    # Apply saved levers if loaded
+    if 'applied_levers' in st.session_state:
+        levers = st.session_state.applied_levers
+
     st.markdown("---")
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Simulation Parameters</h3>", unsafe_allow_html=True)
     duration = st.selectbox("Run duration (months)", [12, 24, 36, 48, 60, 72, 84, 96, 108, 120], index=9)
@@ -897,16 +952,24 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("#### Simulation Actions")
     col_buttons = st.columns(3)
-    with col_buttons[0]: run_btn = st.button("Run", use_container_width=True)
-    with col_buttons[1]: step_btn = st.button("Step (1 month)", use_container_width=True)
-    with col_buttons[2]: reset_btn = st.button("Reset", use_container_width=True)
+    with col_buttons[0]:
+        run_btn = st.button("Run", use_container_width=True)
+    with col_buttons[1]:
+        step_btn = st.button("Step (1 month)", use_container_width=True)
+    with col_buttons[2]:
+        reset_btn = st.button("Reset", use_container_width=True)
     st.caption("Run: full forecast. Step: one month. Reset: clear history.")
+
+    st.markdown("---")
+    # ----- Executive Report Button -----
+    if st.button("📄 Download Executive Report", use_container_width=True):
+        st.session_state['generate_report'] = True
 
     st.markdown("---")
     st.markdown("#### Export Data")
     export_btn = st.button("Export results (CSV)", use_container_width=True)
 
-# --- File Upload ---
+# --- File Upload (unchanged) ---
 with st.expander("Step 1: Upload your CSV files", expanded=True):
     st.markdown("""
     **Instructions:**
@@ -914,9 +977,10 @@ with st.expander("Step 1: Upload your CSV files", expanded=True):
     - Upload **Research Metadata** CSV (columns: `upload_date, teacher_name, school_id_no, ...`).
     """)
     col1, col2 = st.columns(2)
-    with col1: survey_file = st.file_uploader("Survey CSV", type=["csv"], key="survey")
-    with col2: metadata_file = st.file_uploader("Metadata CSV", type=["csv"], key="metadata")
-    st.markdown("---")
+    with col1:
+        survey_file = st.file_uploader("Survey CSV", type=["csv"], key="survey")
+    with col2:
+        metadata_file = st.file_uploader("Metadata CSV", type=["csv"], key="metadata")
     survey_template = ("month,school_id_no,school_name,R,A,C,S,I,P,M\n"
                        "2026-01,1,School_1,0.32,0.41,0.28,0.15,0.14,0.19,0.08")
     metadata_template = ("upload_date,teacher_name,school_id_no,document_type,title,theme,"
@@ -925,16 +989,22 @@ with st.expander("Step 1: Upload your CSV files", expanded=True):
                          "2026-03-15,Anna Reyes,1,abstract,Improving Reading,Teaching Strategies,"
                          "published,https://doi.org/10.1234,True,2026-02-10,2025,10,Teacher II,Master's")
     c1, c2 = st.columns(2)
-    with c1: st.download_button("Survey Template", survey_template, "quarterly_survey_template.csv", "text/csv")
-    with c2: st.download_button("Metadata Template", metadata_template, "research_metadata_template.csv", "text/csv")
+    with c1:
+        st.download_button("Survey Template", survey_template, "quarterly_survey_template.csv", "text/csv")
+    with c2:
+        st.download_button("Metadata Template", metadata_template, "research_metadata_template.csv", "text/csv")
 
 # --- Main Area ---
 if survey_file is not None and metadata_file is not None:
-    survey_df_raw = pd.read_csv(survey_file); metadata_df_raw = pd.read_csv(metadata_file)
+    survey_df_raw = pd.read_csv(survey_file)
+    metadata_df_raw = pd.read_csv(metadata_file)
     survey_df, school_info, survey_error = process_survey(survey_df_raw)
     metadata_df, meta_error = process_metadata(metadata_df_raw)
-    if survey_error: st.error(f"Survey error: {survey_error}")
-    elif meta_error: st.error(f"Metadata error: {meta_error}")
+
+    if survey_error:
+        st.error(f"❌ Survey error: {survey_error}")
+    elif meta_error:
+        st.error(f"❌ Metadata error: {meta_error}")
     else:
         actual_count = len(school_info)
         total_teachers = metadata_df['teacher_name'].nunique()
@@ -957,7 +1027,7 @@ if survey_file is not None and metadata_file is not None:
         selected_school_id = label_to_id[selected_school_label]
         selected_school_name = id_to_label[selected_school_id].split(": ", 1)[1]
 
-        # Baseline
+        # ---------- Baseline section ----------
         st.markdown("<h2 style='text-align: center;'>Baseline from Uploaded Data</h2>", unsafe_allow_html=True)
         st.markdown("---")
         st.markdown("### Research Outputs (Recent)")
@@ -1034,12 +1104,14 @@ if survey_file is not None and metadata_file is not None:
 
         agent_params = get_agent_params(school_ids, survey_df, metadata_df, st.session_state.calibrated_coeff)
 
+        # Initialize simulation
         if 'sim' not in st.session_state:
             st.session_state.sim = init_simulation_with_data(school_ids, metadata_df, random_events, agent_params)
             st.session_state.current_month = 0
             st.session_state.total_months = 0
             st.session_state.history = create_empty_history(school_ids)
 
+        # Run / Step / Reset handlers (unchanged)
         if run_btn:
             st.session_state.sim = init_simulation_with_data(school_ids, metadata_df, random_events, agent_params)
             st.session_state.current_month = 0
@@ -1061,6 +1133,9 @@ if survey_file is not None and metadata_file is not None:
                                                        use_survey, survey_df, metadata_df, selected_school_id)
                     st.session_state.mc_data = mc_data
                     st.session_state.mc_info = mc_info
+            # Clear any previously saved scenario history that may have been generated
+            for s in st.session_state.saved_scenarios.values():
+                s['history'] = None
             st.rerun()
 
         if step_btn:
@@ -1080,6 +1155,7 @@ if survey_file is not None and metadata_file is not None:
             st.session_state.history = create_empty_history(school_ids)
             st.rerun()
 
+        # ---------- Simulation Results Display ----------
         if st.session_state.total_months > 0:
             text_col = DARK_TEXT if dark_mode else LIGHT_TEXT
             st.markdown("<h2 style='text-align: center;'>Simulated Data</h2>", unsafe_allow_html=True)
@@ -1087,6 +1163,7 @@ if survey_file is not None and metadata_file is not None:
             hist = st.session_state.history.get(selected_school_id)
             agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
             if hist and agent:
+                # --- Main 4‑panel chart ---
                 fig1 = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress",
                                                                      "Research Culture Sustainability Index (RCSI)",
                                                                      "Improvement per Completed Cycle"))
@@ -1105,6 +1182,7 @@ if survey_file is not None and metadata_file is not None:
                     fig1.add_annotation(text="No cycles completed yet", xref="x2 domain", yref="y2 domain",
                                         x=0.5, y=0.5, showarrow=False, row=2, col=2)
 
+                # Axis labels (existing)
                 fig1.update_xaxes(title_text="Month", row=1, col=1, title_font=dict(color=text_col, size=14))
                 fig1.update_yaxes(title_text="Value (0-1)", row=1, col=1, title_font=dict(color=text_col, size=14))
                 fig1.update_xaxes(title_text="Month", row=1, col=2, title_font=dict(color=text_col, size=14))
@@ -1119,7 +1197,7 @@ if survey_file is not None and metadata_file is not None:
                 st.plotly_chart(fig1, use_container_width=True)
                 get_figure_download_link(fig1, "simulation_overview.html", "Download Simulation Charts")
 
-                # RCSI Interpretation Table
+                # RCSI Interpretation Table (unchanged)
                 st.markdown("### RCSI Interpretation Table")
                 st.markdown("""
                 | RCSI Range | Level | Description |
@@ -1131,22 +1209,28 @@ if survey_file is not None and metadata_file is not None:
                 | 0.8 – 1.0 | Very High | Excellent vitality; research culture fully embedded. |
                 """)
 
+                # Cycle vs Research Outputs (available to both roles)
                 with st.expander("Cycle vs Research Outputs"):
                     cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
 
-                with st.expander("Division-Level Analysis"):
-                    div_metrics = division_level_analysis(metadata_df, st.session_state.history,
-                                                          st.session_state.sim.agents, dark_mode)
+                # Division‑Level and Comparative Analysis (only Division Head)
+                if st.session_state.user_role == "Division Head":
+                    with st.expander("Division-Level Analysis"):
+                        div_metrics = division_level_analysis(metadata_df, st.session_state.history,
+                                                              st.session_state.sim.agents, dark_mode)
+                    with st.expander("Comparative School Analysis"):
+                        all_schools = school_info['school_id_no'].tolist()
+                        selected_comparison = st.multiselect("Select schools to compare", options=all_schools,
+                                                             format_func=lambda x: id_to_label.get(x, f"ID {x}"),
+                                                             key="comp_selector")
+                        school_comparison_dashboard(survey_df, st.session_state.history, school_info,
+                                                    selected_comparison, dark_mode)
+                else:
+                    # Principal view: hide these sections but keep div_metrics empty
+                    st.markdown("*Division‑Level and Comparative Analysis are not shown in the School Principal view.*")
+                    div_metrics = {}
 
-                with st.expander("Comparative School Analysis"):
-                    all_schools = school_info['school_id_no'].tolist()
-                    selected_comparison = st.multiselect("Select schools to compare", options=all_schools,
-                                                         format_func=lambda x: id_to_label.get(x, f"ID {x}"),
-                                                         key="comp_selector")
-                    school_comparison_dashboard(survey_df, st.session_state.history, school_info,
-                                                selected_comparison, dark_mode)
-
-                # Sensitivity Analysis
+                # Sensitivity Analysis (unchanged)
                 sensitivity_info = ""
                 if not st.session_state.get('sensitivity_fig'):
                     with st.spinner("Computing sensitivity analysis..."):
@@ -1165,7 +1249,7 @@ if survey_file is not None and metadata_file is not None:
                     if sensitivity_info:
                         st.markdown(sensitivity_info)
 
-                # Monte Carlo expander
+                # Monte Carlo expander (unchanged, with causal insight)
                 if 'mc_data' in st.session_state:
                     with st.expander("Monte Carlo Uncertainty Bands"):
                         mc_data = st.session_state.mc_data
@@ -1190,7 +1274,55 @@ if survey_file is not None and metadata_file is not None:
                                 st.session_state.causal_insight = ""
                                 st.info("Not enough Monte Carlo runs for causal analysis (need >10).")
 
-                # School-Level Synopsis
+                # ---------- Phase 3: Scenario Comparison ----------
+                if st.session_state.saved_scenarios:
+                    with st.expander("📊 Scenario Comparison"):
+                        scenario_names = list(st.session_state.saved_scenarios.keys())
+                        col_sc1, col_sc2 = st.columns(2)
+                        with col_sc1:
+                            sc1 = st.selectbox("First scenario", scenario_names, key="sc1")
+                        with col_sc2:
+                            sc2 = st.selectbox("Second scenario", scenario_names, key="sc2")
+                        if st.button("Compare", key="compare_btn"):
+                            # Helper to run a scenario and extract history
+                            def get_scenario_history(name):
+                                scenario = st.session_state.saved_scenarios[name]
+                                if scenario["history"] is None:
+                                    # Run a fresh simulation with the saved levers
+                                    sim = init_simulation_with_data(school_ids, metadata_df, random_events, agent_params)
+                                    temp_hist = create_empty_history(school_ids)
+                                    for m in range(1, duration+1):
+                                        if use_survey:
+                                            apply_survey_override(sim.agents, survey_df, m)
+                                        sim.step(scenario["levers"], m)
+                                        record_history(temp_hist, sim.agents, m)
+                                    # Extract selected school's history
+                                    h = temp_hist[selected_school_id]
+                                    scenario["history"] = {
+                                        "month": h['month'],
+                                        "running_outcome": h['running_outcome'],
+                                        "milestone": h['milestone']
+                                    }
+                                return scenario["history"]
+
+                            hist1 = get_scenario_history(sc1)
+                            hist2 = get_scenario_history(sc2)
+
+                            fig_sc = make_subplots(rows=2, cols=1, subplot_titles=("RCSI Comparison", "Milestone Comparison"))
+                            fig_sc.add_trace(go.Scatter(x=hist1['month'], y=hist1['running_outcome'],
+                                                        mode='lines', name=f"{sc1} RCSI"), row=1, col=1)
+                            fig_sc.add_trace(go.Scatter(x=hist2['month'], y=hist2['running_outcome'],
+                                                        mode='lines', name=f"{sc2} RCSI"), row=1, col=1)
+                            fig_sc.add_trace(go.Scatter(x=hist1['month'], y=hist1['milestone'],
+                                                        mode='lines', name=f"{sc1} Milestone"), row=2, col=1)
+                            fig_sc.add_trace(go.Scatter(x=hist2['month'], y=hist2['milestone'],
+                                                        mode='lines', name=f"{sc2} Milestone"), row=2, col=1)
+                            fig_sc.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
+                            st.plotly_chart(fig_sc, use_container_width=True)
+                else:
+                    st.info("No saved scenarios. Use the Scenario Manager in the sidebar to save policy lever combinations.")
+
+                # ---------- School-Level Synopsis (unchanged, but now includes causal insight) ----------
                 rcsi_val = agent.running_total_outcome
                 rcsi_level = classify_rcsi(rcsi_val)
                 milestone_name = MILESTONE_NAMES.get(agent.current_milestone, f"Milestone {agent.current_milestone}")
@@ -1233,7 +1365,7 @@ if survey_file is not None and metadata_file is not None:
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Baseline vs Simulation gaps table
+                # Baseline vs Simulation gaps table (unchanged)
                 if ('baseline_synopsis' in st.session_state and 'baseline_survey_row' in st.session_state):
                     bs = st.session_state.baseline_synopsis
                     baseline_vals = st.session_state.baseline_survey_row
@@ -1263,79 +1395,84 @@ if survey_file is not None and metadata_file is not None:
                             })
                         st.table(pd.DataFrame(table_data))
 
-                # Division-Level Synopsis
-                total_schools = len(st.session_state.sim.agents)
-                early_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
-                advanced_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
-                transitional = total_schools - early_stage - advanced_stage
-                early_percent = (early_stage / total_schools * 100) if total_schools > 0 else 0
-                advanced_percent = (advanced_stage / total_schools * 100) if total_schools > 0 else 0
-                transitional_percent = (transitional / total_schools * 100) if total_schools > 0 else 0
-                early_text = f"{early_percent:.1f}% of schools" if early_percent > 0 else "No schools"
-                advanced_text = f"{advanced_percent:.1f}% of schools" if advanced_percent > 0 else "No schools"
-                if early_percent == 100:
-                    sustainability_text = "All schools are in early milestones; foundational capacity‑building is the priority."
-                elif early_percent >= 75:
-                    sustainability_text = f"The vast majority ({early_percent:.1f}%) are in early milestones; urgent interventions needed."
-                elif early_percent >= 50:
-                    sustainability_text = f"More than half ({early_percent:.1f}%) are in early milestones; targeted policy support may accelerate progress."
-                elif early_percent > 0:
-                    sustainability_text = f"{early_percent:.1f}% remain in early milestones; continued efforts are required."
+                # Division-Level Synopsis (only for Division Head)
+                if st.session_state.user_role == "Division Head":
+                    total_schools = len(st.session_state.sim.agents)
+                    early_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
+                    advanced_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
+                    transitional = total_schools - early_stage - advanced_stage
+                    early_percent = (early_stage / total_schools * 100) if total_schools > 0 else 0
+                    advanced_percent = (advanced_stage / total_schools * 100) if total_schools > 0 else 0
+                    transitional_percent = (transitional / total_schools * 100) if total_schools > 0 else 0
+                    early_text = f"{early_percent:.1f}% of schools" if early_percent > 0 else "No schools"
+                    advanced_text = f"{advanced_percent:.1f}% of schools" if advanced_percent > 0 else "No schools"
+                    if early_percent == 100:
+                        sustainability_text = "All schools are in early milestones; foundational capacity‑building is the priority."
+                    elif early_percent >= 75:
+                        sustainability_text = f"The vast majority ({early_percent:.1f}%) are in early milestones; urgent interventions needed."
+                    elif early_percent >= 50:
+                        sustainability_text = f"More than half ({early_percent:.1f}%) are in early milestones; targeted policy support may accelerate progress."
+                    elif early_percent > 0:
+                        sustainability_text = f"{early_percent:.1f}% remain in early milestones; continued efforts are required."
+                    else:
+                        sustainability_text = "No schools are in early milestones; the division exhibits a strong, advanced research culture."
+
+                    total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
+                    avg_rcsi = total_outcome / total_schools if total_schools > 0 else 0
+                    level_avg = classify_rcsi(avg_rcsi)
+                    total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
+                    avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
+                    avg_milestone_interp = interpret_avg_milestone(avg_milestone)
+
+                    school_ids_in_sim = [a.real_id for a in st.session_state.sim.agents]
+                    div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
+                    total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
+                    total_research = len(div_metadata)
+                    div_util_rate = (total_utilised / total_research * 100) if total_research > 0 else 0
+
+                    top_div_teacher = div_metrics.get('top_div_teacher', 'N/A')
+                    top_div_school = div_metrics.get('top_div_school', 'N/A')
+                    top_div_outputs = div_metrics.get('top_div_outputs', 0)
+                    bottleneck_milestone = div_metrics.get('bottleneck_milestone', 'N/A')
+                    bottleneck_time = div_metrics.get('bottleneck_time', 0)
+
+                    output_trend_div = ""
+                    if not metadata_df.empty and 'upload_date' in metadata_df.columns:
+                        div_timeline = metadata_df.groupby(metadata_df['upload_date'].dt.to_period('Q')).size()
+                        if len(div_timeline) >= 2:
+                            if div_timeline.iloc[-1] > div_timeline.iloc[-2]:
+                                output_trend_div = "The division's research output is increasing over time."
+                            elif div_timeline.iloc[-1] < div_timeline.iloc[-2]:
+                                output_trend_div = "The division's research output is declining over time."
+                            else:
+                                output_trend_div = "The division's research output has remained stable."
+                            avg_div_output = div_timeline.mean()
+                            output_trend_div += f" On average, the division produces {avg_div_output:.1f} outputs per quarter."
+
+                    full_bottleneck = MILESTONE_NAMES.get(int(bottleneck_milestone.replace('M', '')) if isinstance(bottleneck_milestone, str) and bottleneck_milestone.startswith('M') else 0, bottleneck_milestone)
+                    bottleneck_insight = f"Schools spend the most time on average in {full_bottleneck} ({bottleneck_time:.1f} months). This is the critical bottleneck." if bottleneck_milestone != "N/A" else ""
+                    top_teacher_insight = f"The division's top researcher is {top_div_teacher} from {top_div_school} with {top_div_outputs} outputs." if top_div_teacher != "N/A" else ""
+
+                    bg_div = '#2E2E2E' if dark_mode else '#E8F5E9'
+                    st.markdown(f"""
+                    <div style="background-color: {bg_div}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
+                    <b>Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
+                    - Average milestone = {avg_milestone:.1f} → {avg_milestone_interp}<br>
+                    - Total completed cycles = {total_cycles}<br>
+                    - Average RCSI = <b>{avg_rcsi:.3f}</b> → <b>{level_avg}</b> level.<br>
+                    - Average research utilisation rate = <b>{div_util_rate:.1f}%</b>.<br>
+                    - Stage distribution: {early_text} are in early stages (M≤2), {transitional_percent:.1f}% transitional (M3), and {advanced_text} are advanced (M≥4).<br>
+                    <i>Division‑wide sustainability assessment:</i> {sustainability_text}<br><br>
+                    <b>Productivity:</b> {output_trend_div}<br>
+                    <b>Bottleneck:</b> {bottleneck_insight}<br>
+                    <b>Top Division Researcher:</b> {top_teacher_insight}
+                    </div>
+                    """, unsafe_allow_html=True)
                 else:
-                    sustainability_text = "No schools are in early milestones; the division exhibits a strong, advanced research culture."
+                    st.markdown("---")
+                    st.markdown("*Division‑Level Synopsis is not shown in the School Principal view.*")
 
-                total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
-                avg_rcsi = total_outcome / total_schools if total_schools > 0 else 0
-                level_avg = classify_rcsi(avg_rcsi)
-                total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
-                avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
-                avg_milestone_interp = interpret_avg_milestone(avg_milestone)
-
-                school_ids_in_sim = [a.real_id for a in st.session_state.sim.agents]
-                div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
-                total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
-                total_research = len(div_metadata)
-                div_util_rate = (total_utilised / total_research * 100) if total_research > 0 else 0
-
-                top_div_teacher = div_metrics.get('top_div_teacher', 'N/A')
-                top_div_school = div_metrics.get('top_div_school', 'N/A')
-                top_div_outputs = div_metrics.get('top_div_outputs', 0)
-                bottleneck_milestone = div_metrics.get('bottleneck_milestone', 'N/A')
-                bottleneck_time = div_metrics.get('bottleneck_time', 0)
-
-                output_trend_div = ""
-                if not metadata_df.empty and 'upload_date' in metadata_df.columns:
-                    div_timeline = metadata_df.groupby(metadata_df['upload_date'].dt.to_period('Q')).size()
-                    if len(div_timeline) >= 2:
-                        if div_timeline.iloc[-1] > div_timeline.iloc[-2]:
-                            output_trend_div = "The division's research output is increasing over time."
-                        elif div_timeline.iloc[-1] < div_timeline.iloc[-2]:
-                            output_trend_div = "The division's research output is declining over time."
-                        else:
-                            output_trend_div = "The division's research output has remained stable."
-                        avg_div_output = div_timeline.mean()
-                        output_trend_div += f" On average, the division produces {avg_div_output:.1f} outputs per quarter."
-
-                full_bottleneck = MILESTONE_NAMES.get(int(bottleneck_milestone.replace('M', '')) if isinstance(bottleneck_milestone, str) and bottleneck_milestone.startswith('M') else 0, bottleneck_milestone)
-                bottleneck_insight = f"Schools spend the most time on average in {full_bottleneck} ({bottleneck_time:.1f} months). This is the critical bottleneck." if bottleneck_milestone != "N/A" else ""
-                top_teacher_insight = f"The division's top researcher is {top_div_teacher} from {top_div_school} with {top_div_outputs} outputs." if top_div_teacher != "N/A" else ""
-
-                bg_div = '#2E2E2E' if dark_mode else '#E8F5E9'
-                st.markdown(f"""
-                <div style="background-color: {bg_div}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
-                <b>Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
-                - Average milestone = {avg_milestone:.1f} → {avg_milestone_interp}<br>
-                - Total completed cycles = {total_cycles}<br>
-                - Average RCSI = <b>{avg_rcsi:.3f}</b> → <b>{level_avg}</b> level.<br>
-                - Average research utilisation rate = <b>{div_util_rate:.1f}%</b>.<br>
-                - Stage distribution: {early_text} are in early stages (M≤2), {transitional_percent:.1f}% transitional (M3), and {advanced_text} are advanced (M≥4).<br>
-                <i>Division‑wide sustainability assessment:</i> {sustainability_text}<br><br>
-                <b>Productivity:</b> {output_trend_div}<br>
-                <b>Bottleneck:</b> {bottleneck_insight}<br>
-                <b>Top Division Researcher:</b> {top_teacher_insight}
-                </div>
-                """, unsafe_allow_html=True)
-
+                # Graph Interpretations (unchanged)
                 with st.expander("Graph Interpretations"):
                     st.markdown("""
                     - **Variable Evolution:** How R, A, C, S, I, P, M change over time. Higher values (closer to 1) mean stronger readiness, awareness, capacity, etc.
@@ -1351,7 +1488,40 @@ if survey_file is not None and metadata_file is not None:
                     - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
                     """)
 
-            # Export button
+                # ---------- Phase 3: Executive Report Generation ----------
+                if st.session_state.get('generate_report', False):
+                    st.session_state.generate_report = False
+                    with st.spinner("Generating executive report..."):
+                        report_html = "<html><head><title>Executive Report</title></head><body>"
+                        report_html += f"<h1>CDO Research Culture Executive Report</h1>"
+                        report_html += f"<h2>School: {selected_school_name}</h2>"
+                        report_html += f"<p>Date: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M')}</p>"
+
+                        # Baseline radar chart
+                        if latest is not None:
+                            radar_fig = build_radar_chart(tuple(latest[v] for v in VARIABLES), selected_school_name, dark_mode)
+                            report_html += "<h3>Baseline Research Culture Profile</h3>" + radar_fig.to_html(include_plotlyjs='cdn', full_html=False)
+
+                        # Simulation overview chart (reuse the existing fig1)
+                        report_html += "<h3>Simulation Overview</h3>" + fig1.to_html(include_plotlyjs='cdn', full_html=False)
+
+                        # Sensitivity tornado
+                        if st.session_state.get('sensitivity_fig'):
+                            report_html += "<h3>Sensitivity Analysis</h3>" + st.session_state.sensitivity_fig.to_html(include_plotlyjs='cdn', full_html=False)
+
+                        # Monte Carlo bands
+                        if 'mc_data' in st.session_state:
+                            report_html += "<h3>Monte Carlo Uncertainty</h3>" + plot_monte_carlo_bands(st.session_state.mc_data, dark_mode).to_html(include_plotlyjs='cdn', full_html=False)
+
+                        # Synopsis text
+                        report_html += "<h3>School-Level Synopsis</h3><p>" + synopsis.replace('\n', '<br>') + "</p>"
+
+                        report_html += "</body></html>"
+                        b64 = base64.b64encode(report_html.encode()).decode()
+                        href = f'<a href="data:text/html;base64,{b64}" download="executive_report.html">📥 Download Executive Report</a>'
+                        st.markdown(href, unsafe_allow_html=True)
+
+            # Export button (unchanged)
             if export_btn:
                 all_data = []
                 for a in st.session_state.sim.agents:
@@ -1370,7 +1540,6 @@ if survey_file is not None and metadata_file is not None:
                 df_cycles = pd.DataFrame(cycle_records)
                 st.download_button("Download simulation history", df_hist.to_csv(index=False).encode('utf-8'), "simulation_history.csv", "text/csv")
                 st.download_button("Download cycle improvements", df_cycles.to_csv(index=False).encode('utf-8'), "cycle_improvements.csv", "text/csv")
-    # ... right after the file upload expander ...
-if survey_file is None or metadata_file is None:
+
+else:
     st.info("Upload quarterly survey and research metadata CSV files to begin.")
-    st.stop()   # <-- optional: stop further execution until files are uploaded
