@@ -1370,4 +1370,7 @@ if survey_file is not None and metadata_file is not None:
                 df_cycles = pd.DataFrame(cycle_records)
                 st.download_button("Download simulation history", df_hist.to_csv(index=False).encode('utf-8'), "simulation_history.csv", "text/csv")
                 st.download_button("Download cycle improvements", df_cycles.to_csv(index=False).encode('utf-8'), "cycle_improvements.csv", "text/csv")
-    st.info("Please upload quarterly survey and research metadata CSV files to begin.") 
+    # ... right after the file upload expander ...
+if survey_file is None or metadata_file is None:
+    st.info("Upload quarterly survey and research metadata CSV files to begin.")
+    st.stop()   # <-- optional: stop further execution until files are uploaded
