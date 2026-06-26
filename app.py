@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import List, Dict, Optional, Tuple, Any
 import math
 import base64
+import copy
 
 try:
     from sklearn.linear_model import LinearRegression
