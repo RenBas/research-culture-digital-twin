@@ -922,7 +922,19 @@ with st.sidebar:
         u_lead = st.slider("Leadership commit.", 0.0, 1.0, 0.5, 0.05)
         u_collab = st.slider("Collaboration freq.", 0.0, 1.0, 0.5, 0.05)
     levers = {'u_train': u_train, 'u_mentor': u_mentor, 'u_budget': u_budget, 'u_lead': u_lead, 'u_collab': u_collab}
-
+    
+    # ---------- User Authentication (coming soon) ----------
+    with st.expander("🔐 User Authentication (coming soon)", expanded=False):
+        st.markdown(
+            "When activated, each user will log in with their own credentials. "
+            "The system will automatically assign the correct role (Division Head or School Principal) "
+            "and restrict data access accordingly."
+        )
+        disabled_username = st.text_input("Username", value="", disabled=True, key="disabled_user")
+        disabled_password = st.text_input("Password", value="", type="password", disabled=True, key="disabled_pass")
+        st.button("Login", disabled=True, key="disabled_login_btn")
+        st.caption("📌 This feature will be enabled when the Twin is ready for secure multi‑user deployment.")
+    
     # ---------- Scenario Manager ----------
     st.markdown("---")
     st.markdown("#### 📁 Scenario Manager")
