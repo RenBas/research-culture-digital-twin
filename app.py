@@ -879,7 +879,21 @@ with st.sidebar:
     with st.expander("📖 Glossary / Help", expanded=False):
         st.markdown("""
         **RCSI** – Research Culture Sustainability Index.  
-        ...
+        A cumulative score that grows each month based on Impact (M) and Collaboration (P).  
+        Higher = better. Classified as Very Low / Low / Moderate / High / Very High.
+
+        **Milestones (M0–M6)** – The seven stages a school passes through:  
+        M0 Readiness → M1 Awareness → M2 Capacity → M3 Support → M4 Institutional → M5 Community → M6 Impact.  
+        Reaching M6 and cycling back means a full sustainable cycle has been completed.
+
+        **Sensitivity Tornado** – Shows how much the final RCSI changes when each policy lever
+        is varied by ±10% while the others stay fixed. The longest bar = most influential lever.
+
+        **Monte Carlo Bands** – Runs the simulation many times with slight random variations and
+        shows the range (P10–P90) of possible outcomes. The shaded band is the uncertainty.
+
+        **Scenario Comparison** – Lets you save different lever combinations and compare
+        their RCSI and milestone trajectories side‑by‑side.
         """)
 
     st.metric("Total Schools Loaded", st.session_state.num_schools)
