@@ -1323,45 +1323,46 @@ if survey_file is not None and metadata_file is not None:
                             fig_sc.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
                             st.plotly_chart(fig_sc, use_container_width=True)
 
-                            # --- Revised Scenario Comparison Analysis ---
-                            final_rcsi1 = hist1['running_outcome'][-1]
-                            final_rcsi2 = hist2['running_outcome'][-1]
-                            final_mil1 = hist1['milestone'][-1]
-                            final_mil2 = hist2['milestone'][-1]
+                            # --- Revised Scenario Comparison Analysis (explicit values) ---
+final_rcsi1 = hist1['running_outcome'][-1]
+final_rcsi2 = hist2['running_outcome'][-1]
+final_mil1 = hist1['milestone'][-1]
+final_mil2 = hist2['milestone'][-1]
 
-                            rcsi_better = sc1 if final_rcsi1 > final_rcsi2 else sc2
-                            rcsi_diff = abs(final_rcsi1 - final_rcsi2)
-                            rcsi_gap_label = "small" if rcsi_diff < 0.005 else ("moderate" if rcsi_diff < 0.02 else "large")
+rcsi_diff = abs(final_rcsi1 - final_rcsi2)
+gap_label = "tiny" if rcsi_diff < 0.005 else ("small" if rcsi_diff < 0.02 else "moderate")
 
-                            mil_order = sorted([(final_mil1, sc1), (final_mil2, sc2)], key=lambda x: x[0], reverse=True)
-                            mil_better = mil_order[0][1]
-                            mil_same = (final_mil1 == final_mil2)
+# Build explicit RCSI description
+rcsi_desc = f"RCSI for '{sc1}' = {final_rcsi1:.3f}, RCSI for '{sc2}' = {final_rcsi2:.3f}"
+if final_rcsi1 == final_rcsi2:
+    rcsi_desc += " (identical)"
+else:
+    rcsi_desc += f" (difference of {rcsi_diff:.3f}, a {gap_label} gap)"
 
-                            if mil_same:
-                                milestone_wording = f"both scenarios end at the same milestone (M{final_mil1})"
-                            else:
-                                milestone_wording = (f"'{mil_better}' reaches a higher milestone (M{mil_order[0][0]} vs M{mil_order[1][0]})")
+# Milestone description
+if final_mil1 == final_mil2:
+    milestone_text = f"both scenarios end at the same milestone (M{final_mil1})"
+else:
+    milestone_text = (f"'{sc1 if final_mil1 > final_mil2 else sc2}' reaches a higher milestone "
+                      f"(M{max(final_mil1, final_mil2)} vs M{min(final_mil1, final_mil2)})")
 
-                            if final_rcsi1 == final_rcsi2:
-                                rcsi_wording = "final RCSI is identical"
-                            else:
-                                rcsi_wording = (f"'{rcsi_better}' yields a slightly higher final RCSI "
-                                                f"({max(final_rcsi1, final_rcsi2):.3f} vs {min(final_rcsi1, final_rcsi2):.3f}, "
-                                                f"difference of {rcsi_diff:.3f}, a {rcsi_gap_label} gap)")
+# Practical conclusion
+if rcsi_diff < 0.005 and final_mil1 == final_mil2:
+    conclusion = "The difference is negligible. Both policy combinations yield practically equivalent results."
+elif final_rcsi1 > final_rcsi2:
+    better, worse = sc1, sc2
+    conclusion = (f"'{better}' shows a {gap_label} RCSI advantage and comparable milestone progress, "
+                  f"suggesting its policy mix is slightly more effective.")
+else:
+    better, worse = sc2, sc1
+    conclusion = (f"'{better}' shows a {gap_label} RCSI advantage and comparable milestone progress, "
+                  f"suggesting its policy mix is slightly more effective.")
 
-                            if rcsi_better == mil_better or mil_same:
-                                advantage = "and it holds a comparable or better milestone, suggesting its policy mix is more effective overall."
-                            else:
-                                advantage = (f"but '{mil_better}' achieves a higher milestone, so the trade‑off is nuanced: "
-                                             f"'{rcsi_better}' may be generating more cumulative impact despite a slightly lower milestone.")
+comp_text = (f"**Scenario Comparison Analysis:** After {duration} months, "
+             f"{rcsi_desc}; {milestone_text}. {conclusion}")
 
-                            comp_text = (
-                                f"**Scenario Comparison Analysis:** After {duration} months, "
-                                f"{rcsi_wording}; {milestone_wording}. "
-                                f"{advantage}"
-                            )
-                            st.markdown(comp_text)
-                            st.session_state.scenario_comparison_text = comp_text
+st.markdown(comp_text)
+st.session_state.scenario_comparison_text = comp_text
                 else:
                     st.info("No saved scenarios. Use the Scenario Manager in the sidebar to save policy lever combinations.")
                     st.session_state.scenario_comparison_text = ""
