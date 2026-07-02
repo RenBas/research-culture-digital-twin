@@ -1,5 +1,6 @@
 # ============================================================
-# Digital Twin – CDO Research Culture Framework (Phase 1+2 Merged, Fixed)
+# Digital Twin – CDO Research Culture Framework (Phase 1+2 Merged)
+# with Gauges, Role Selector, Comparative Gauges, and Full Axis Labels
 # ============================================================
 import streamlit as st
 import pandas as pd
@@ -70,6 +71,18 @@ VAR_FULL_NAMES = {
     'S': 'Structured Support (S)', 'I': 'Institutional Anchoring (I)',
     'P': 'Community of Practice (P)', 'M': 'Impact Realization (M)',
 }
+
+VAR_INTERPRETATION = {
+    'R': ['Very Low Readiness', 'Low Readiness', 'Moderate Readiness', 'High Readiness', 'Very High Readiness'],
+    'A': ['Very Low Awareness', 'Low Awareness', 'Moderate Awareness', 'High Awareness', 'Very High Awareness'],
+    'C': ['Very Low Capacity', 'Low Capacity', 'Moderate Capacity', 'High Capacity', 'Very High Capacity'],
+    'S': ['Very Low Support', 'Low Support', 'Moderate Support', 'High Support', 'Very High Support'],
+    'I': ['Very Low Anchoring', 'Low Anchoring', 'Moderate Anchoring', 'High Anchoring', 'Very High Anchoring'],
+    'P': ['Very Low CoP', 'Low CoP', 'Moderate CoP', 'High CoP', 'Very High CoP'],
+    'M': ['Very Low Impact', 'Low Impact', 'Moderate Impact', 'High Impact', 'Very High Impact'],
+}
+
+RCSI_INTERPRETATION = ['Very Low', 'Low', 'Moderate', 'High', 'Very High']
 
 MILESTONE_THRESHOLDS = {
     0: ('A', 0.8, 1),
@@ -145,6 +158,13 @@ def interpret_utilisation_rate(rate: float) -> Tuple[str, str]:
     elif rate < 80: return "High", "Strong translation."
     else: return "Very High", "Excellent utilisation."
 
+def classify_utilisation(rate: float) -> str:
+    if rate < 20: return "Very Low"
+    elif rate < 40: return "Low"
+    elif rate < 60: return "Moderate"
+    elif rate < 80: return "High"
+    else: return "Very High"
+
 def month_str_to_num(month_str: Any) -> int:
     try:
         parts = str(month_str).strip().split('-')
@@ -215,6 +235,126 @@ def get_figure_download_link(fig, filename="chart.html", link_text="Download cha
     b64 = base64.b64encode(html_str.encode()).decode()
     href = f'<a href="data:text/html;base64,{b64}" download="{filename}">{link_text}</a>'
     st.markdown(href, unsafe_allow_html=True)
+
+
+# ============================================================
+# GAUGE BUILDERS
+# ============================================================
+
+def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 1.0,
+                 threshold: Optional[float] = None, threshold_color: str = DEPED_RED,
+                 steps: List[Tuple[float, float, str]] = None,
+                 dark_mode: bool = False) -> go.Figure:
+    """
+    Create a circular gauge with needle, optional threshold marker, and color segments.
+    """
+    if steps is None:
+        steps = [
+            (0.0, 0.2, "#D32F2F"),   # Red
+            (0.2, 0.4, "#F5A623"),   # Gold
+            (0.4, 0.6, "#FFD54F"),   # Light Gold
+            (0.6, 0.8, "#66BB6A"),   # Green
+            (0.8, 1.0, "#2E7D32"),   # Dark Green
+        ]
+
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number+delta",
+        value = value,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        title = {'text': title, 'font': {'size': 14, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE}},
+        gauge = {
+            'axis': {'range': [min_val, max_val], 'tickwidth': 1, 'tickcolor': "darkblue",
+                     'tickvals': [0, 0.2, 0.4, 0.6, 0.8, 1.0],
+                     'ticktext': ['0', '', '', '', '', '1'],  # minimal tick labels
+                     'showticklabels': False},  # hide numeric ticks
+            'bar': {'color': "rgba(0,0,0,0)"},  # no bar, we'll use needle
+            'bgcolor': "rgba(0,0,0,0)",
+            'borderwidth': 0,
+            'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
+            'threshold': {
+                'line': {'color': threshold_color, 'width': 4},
+                'thickness': 0.75,
+                'value': threshold
+            } if threshold is not None else None
+        },
+        number = {'font': {'size': 20, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE},
+                  'suffix': '  '}
+    ))
+    fig.update_layout(
+        height=220,
+        margin=dict(l=20, r=20, t=40, b=20),
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE)
+    )
+    return fig
+
+def create_utilisation_gauge(value: float, title: str, dark_mode: bool = False) -> go.Figure:
+    steps = [
+        (0, 20, "#D32F2F"),
+        (20, 40, "#F5A623"),
+        (40, 60, "#FFD54F"),
+        (60, 80, "#66BB6A"),
+        (80, 100, "#2E7D32"),
+    ]
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = value,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        title = {'text': title, 'font': {'size': 14, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE}},
+        gauge = {
+            'axis': {'range': [0, 100], 'tickwidth': 1, 'tickcolor': "darkblue",
+                     'tickvals': [0, 20, 40, 60, 80, 100],
+                     'ticktext': ['0', '', '', '', '', '100'],
+                     'showticklabels': False},
+            'bar': {'color': "rgba(0,0,0,0)"},
+            'bgcolor': "rgba(0,0,0,0)",
+            'borderwidth': 0,
+            'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
+        },
+        number = {'font': {'size': 20, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE},
+                  'suffix': '%  '}
+    ))
+    fig.update_layout(
+        height=200,
+        margin=dict(l=20, r=20, t=40, b=20),
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE)
+    )
+    return fig
+
+def create_rcsi_gauge(value: float, title: str, dark_mode: bool = False) -> go.Figure:
+    steps = [
+        (0.0, 0.2, "#D32F2F"),
+        (0.2, 0.4, "#F5A623"),
+        (0.4, 0.6, "#FFD54F"),
+        (0.6, 0.8, "#66BB6A"),
+        (0.8, 1.0, "#2E7D32"),
+    ]
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number",
+        value = value,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        title = {'text': title, 'font': {'size': 14, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE}},
+        gauge = {
+            'axis': {'range': [0, 1], 'tickwidth': 1, 'tickcolor': "darkblue",
+                     'tickvals': [0, 0.2, 0.4, 0.6, 0.8, 1.0],
+                     'ticktext': ['0', '', '', '', '', '1'],
+                     'showticklabels': False},
+            'bar': {'color': "rgba(0,0,0,0)"},
+            'bgcolor': "rgba(0,0,0,0)",
+            'borderwidth': 0,
+            'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
+        },
+        number = {'font': {'size': 20, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE},
+                  'suffix': '  '}
+    ))
+    fig.update_layout(
+        height=200,
+        margin=dict(l=20, r=20, t=40, b=20),
+        paper_bgcolor="rgba(0,0,0,0)",
+        font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE)
+    )
+    return fig
 
 
 # ============================================================
@@ -552,7 +692,7 @@ def run_sensitivity(sim_class, agent_params, school_ids, levers, duration, use_s
     fig = px.bar(df, x='Change', y='Lever', color='Direction', orientation='h',
                  title='Sensitivity of Final RCSI to Policy Levers (±10%)',
                  color_discrete_map={'Low Change': DEPED_RED, 'High Change': USTP_GOLD})
-    fig.update_layout(template='plotly_white')
+    fig.update_layout(template='plotly_white', xaxis_title="Change in RCSI", yaxis_title="Policy Lever")
     impacts = {lever: abs(results[(lever, 0.1)] - base_rcsi) + abs(results[(lever, -0.1)] - base_rcsi) for lever in lever_names}
     most_impactful = max(impacts, key=impacts.get)
     sensitivity_info = f"Sensitivity analysis shows that **{most_impactful}** has the greatest influence on final RCSI."
@@ -626,7 +766,9 @@ def plot_monte_carlo_bands(mc_data, dark_mode):
     fig.add_trace(go.Scatter(x=months, y=mc_data['milestone']['p90'], fill='tonexty',
                              fillcolor='rgba(211,47,47,0.2)', line=dict(color='rgba(0,0,0,0)'),
                              showlegend=False, hoverinfo='none'), row=2, col=1)
-    fig.update_layout(height=700, template='plotly_dark' if dark_mode else 'plotly_white')
+    fig.update_layout(height=700, template='plotly_dark' if dark_mode else 'plotly_white',
+                      xaxis_title="Month", yaxis_title="RCSI",
+                      xaxis2_title="Month", yaxis2_title="Milestone")
     fig.update_xaxes(title_text="Month", row=1, col=1); fig.update_yaxes(title_text="RCSI", row=1, col=1)
     fig.update_xaxes(title_text="Month", row=2, col=1); fig.update_yaxes(title_text="Milestone", row=2, col=1)
     return fig
@@ -711,67 +853,8 @@ def get_latest_survey(survey_df, school_id):
 
 
 # ============================================================
-# CHART BUILDERS (Radar with RCSI and M0 rings)
+# RESEARCH METRICS
 # ============================================================
-
-@st.cache_data(show_spinner=False)
-def build_radar_chart(survey_values_tuple, school_name, dark_mode, rcsi=None, threshold=0.8):
-    """
-    Build a radar chart with optional concentric rings:
-    - Dashed red ring at `threshold` (default 0.8) marks the M0 → M1 threshold (Awareness).
-    - Solid blue ring at `rcsi` (if provided) shows the current Research Culture Sustainability Index.
-    """
-    labels = [f"{v} ({MILESTONE_SHORT[i]})" for i, v in enumerate(VARIABLES)]
-    values = list(survey_values_tuple)
-    fig = go.Figure()
-
-    # Main filled polygon
-    fig.add_trace(go.Scatterpolar(
-        r=values, theta=labels, fill='toself', name=school_name,
-        line_color=USTP_GOLD, fillcolor="rgba(245, 166, 35, 0.3)",
-        hovertemplate='<b>%{theta}</b><br>Score: %{r:.3f}<extra></extra>'
-    ))
-
-    # Milestone 0 threshold ring (Awareness >= 0.8)
-    if threshold is not None:
-        fig.add_trace(go.Scatterpolar(
-            r=[threshold] * 100,
-            theta=np.linspace(0, 360, 100),
-            mode='lines',
-            name=f'M0 Threshold ({threshold:.1f})',
-            line=dict(color=DEPED_RED, dash='dash', width=2),
-            showlegend=True
-        ))
-
-    # RCSI ring (if provided and within 0-1)
-    if rcsi is not None and 0 <= rcsi <= 1:
-        fig.add_trace(go.Scatterpolar(
-            r=[rcsi] * 100,
-            theta=np.linspace(0, 360, 100),
-            mode='lines',
-            name=f'RCSI = {rcsi:.3f}',
-            line=dict(color=USTP_DARK_BLUE, width=3),
-            showlegend=True
-        ))
-
-    text_color = USTP_GOLD if dark_mode else USTP_DARK_BLUE
-    fig.update_layout(
-        template='plotly_dark' if dark_mode else 'plotly_white',
-        polar=dict(
-            radialaxis=dict(visible=True, range=[0, 1.0],
-                            tickvals=[0, 0.2, 0.4, 0.6, 0.8, 1.0],
-                            ticktext=['0', '0.2', '0.4', '0.6', '0.8', '1.0'],
-                            color=text_color),
-            angularaxis=dict(direction="clockwise", tickfont=dict(size=11, color=text_color))
-        ),
-        title=f"Current Research Culture Profile (latest quarter)<br>{school_name}",
-        showlegend=True,
-        font=dict(color=text_color),
-        height=500,
-        margin=dict(l=60, r=80, t=80, b=100)
-    )
-    return fig
-
 
 @st.cache_data(show_spinner=False)
 def _compute_research_metrics(metadata_df, school_id):
@@ -852,63 +935,6 @@ def _compute_research_metrics(metadata_df, school_id):
         metrics['edu_summary'] = None
     return metrics
 
-def render_research_dashboard(metrics, school_name, dark_mode):
-    figs = {}
-    template = 'plotly_dark' if dark_mode else 'plotly_white'
-    if 'theme_counts' in metrics:
-        figs['theme_distribution'] = px.bar(metrics['theme_counts'], x='Theme', y='Count',
-                                            title=f"Theme Distribution - {school_name}",
-                                            color='Theme', color_discrete_sequence=[USTP_GOLD, DEPED_RED, USTP_DARK_BLUE])
-        figs['theme_distribution'].update_layout(template=template)
-    if metrics.get('theme_util_df') is not None:
-        figs['theme_utilisation'] = px.bar(metrics['theme_util_df'], x='Theme', y='Utilisation Rate',
-                                           title=f"Theme Utilisation Rate - {school_name}",
-                                           color='Utilisation Rate', color_continuous_scale=['#F5A623', '#0D2B5E'])
-        figs['theme_utilisation'].update_layout(template=template)
-    if 'status_counts' in metrics:
-        figs['publication_status'] = px.bar(metrics['status_counts'], x='Status', y='Count',
-                                            title=f"Publication Status - {school_name}",
-                                            color='Status', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_MAROON])
-        figs['publication_status'].update_layout(template=template)
-    if metrics.get('output_timeline') is not None:
-        figs['output_timeline'] = px.line(metrics['output_timeline'], x='quarter', y='count',
-                                          title=f"Research Output Timeline - {school_name}", markers=True)
-        figs['output_timeline'].update_layout(template=template, xaxis_title='Quarter', yaxis_title='Number of Outputs')
-    if metrics.get('util_timeline') is not None:
-        figs['util_timeline'] = px.line(metrics['util_timeline'], x='quarter', y='utilisation_rate',
-                                        title=f"Utilisation Rate Over Time - {school_name}", markers=True)
-        figs['util_timeline'].update_layout(template=template, xaxis_title='Quarter', yaxis_title='Utilisation Rate')
-    if 'teacher_counts' in metrics:
-        figs['teacher_productivity'] = px.bar(metrics['teacher_counts'], x='Number of Outputs', y='Teacher',
-                                              orientation='h', title=f"Teacher Productivity (Top 10) - {school_name}",
-                                              color='Number of Outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
-        figs['teacher_productivity'].update_layout(template=template)
-    sd = metrics.get('service_data')
-    if sd is not None:
-        ts = sd['teacher_summary']
-        text_color = USTP_GOLD if dark_mode else USTP_DARK_BLUE
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=ts['years_of_service'], y=ts['output_count'], mode='markers',
-                                 marker=dict(size=12, color=USTP_GOLD, line=dict(color=USTP_DARK_BLUE, width=1)),
-                                 text=ts.index, hoverinfo='text+x+y', name='Teachers'))
-        fig.add_trace(go.Scatter(x=sd['trend_x'], y=sd['trend_y'], mode='lines',
-                                 line=dict(color=USTP_DARK_BLUE, width=2, dash='dash'), name='Trend'))
-        fig.update_layout(template=template, title=f"Years of Service vs Research Outputs - {school_name}",
-                          xaxis_title="Years of Service", yaxis_title="Number of Outputs",
-                          font=dict(color=text_color), showlegend=True, height=400)
-        figs['service_vs_output'] = fig
-    if metrics.get('rank_summary') is not None:
-        figs['rank_breakdown'] = px.bar(metrics['rank_summary'], x='teacher_rank', y='total_outputs',
-                                        title=f"Research Outputs by Teacher Rank - {school_name}",
-                                        color='total_outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
-        figs['rank_breakdown'].update_layout(template=template)
-    if metrics.get('edu_summary') is not None:
-        figs['edu_breakdown'] = px.bar(metrics['edu_summary'], x='educational_attainment', y='total_outputs',
-                                       title=f"Research Outputs by Educational Attainment - {school_name}",
-                                       color='total_outputs', color_continuous_scale=['#F5A623', '#0D2B5E'])
-        figs['edu_breakdown'].update_layout(template=template)
-    return figs
-
 
 # ============================================================
 # BASELINE / SYNOPSIS / HEATMAP
@@ -947,8 +973,10 @@ def baseline_heatmap(survey_df, metadata_df, dark_mode):
         st.info("Insufficient data.")
         return
     corr = merged[VARIABLES + ['output_count']].corr()
-    fig = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues')
-    fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+    fig = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues',
+                    height=650, width=850)
+    fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white',
+                      xaxis_title="Variables", yaxis_title="Variables")
     st.plotly_chart(fig, use_container_width=True)
     st.caption("Correlation between the seven variables and research output count in historical data.")
 
@@ -963,7 +991,9 @@ def cycle_research_correlation(agent, metadata_df, school_id, dark_mode):
     fig.add_trace(go.Scatter(x=[c.cycle_number for c in agent.cycle_improvements], y=cumulative,
                              mode='markers+lines', marker=dict(size=10, color=USTP_GOLD),
                              line=dict(color=USTP_DARK_BLUE)))
-    fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white', title="Cycle vs Cumulative Research Outputs")
+    fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white',
+                      title="Cycle vs Cumulative Research Outputs",
+                      xaxis_title="Cycle Number", yaxis_title="Cumulative Outputs")
     st.plotly_chart(fig, use_container_width=True)
 
 def division_level_analysis(metadata_df, history_per_school, sim_agents, dark_mode):
@@ -999,7 +1029,8 @@ def division_level_analysis(metadata_df, history_per_school, sim_agents, dark_mo
         bottleneck = max_row['Milestone']; bottleneck_time = max_row['Avg Months']
         fig_dur = px.bar(df_dur, x='Milestone', y='Avg Months', title="Average Months per Milestone",
                          color='Avg Months', color_continuous_scale=['#F5A623', '#0D2B5E'])
-        fig_dur.update_layout(template='plotly_dark' if dark_mode else 'plotly_white')
+        fig_dur.update_layout(template='plotly_dark' if dark_mode else 'plotly_white',
+                              xaxis_title="Milestone", yaxis_title="Average Months")
         st.plotly_chart(fig_dur, use_container_width=True)
         st.caption(f"Bottleneck: {bottleneck} ({bottleneck_time:.1f} months).")
     else:
@@ -1008,22 +1039,39 @@ def division_level_analysis(metadata_df, history_per_school, sim_agents, dark_mo
             'top_div_outputs': top_div_outputs, 'bottleneck_milestone': bottleneck,
             'bottleneck_time': bottleneck_time}
 
-def school_comparison_dashboard(survey_df, history_per_school, school_info, selected_school_ids, dark_mode):
-    st.markdown("### Comparative School Analysis")
-    if len(selected_school_ids) < 2:
+def school_comparison_gauge(school_ids, school_info, history_per_school, dark_mode, milestone_choice: int = None):
+    """
+    Display comparative gauges for up to 3 schools.
+    """
+    st.markdown("### Comparative School Analysis (Gauges)")
+    if len(school_ids) < 2:
         st.info("Select at least two schools.")
         return
-    histories = {sid: history_per_school.get(sid) for sid in selected_school_ids if history_per_school.get(sid)}
-    if not histories:
-        st.info("No simulation history.")
-        return
-    fig = make_subplots(rows=2, cols=1, subplot_titles=("RCSI Comparison", "Milestone Comparison"))
-    for sid, hist in histories.items():
+    if len(school_ids) > 3:
+        st.warning("Limit to 3 schools. Only first 3 will be shown.")
+        school_ids = school_ids[:3]
+
+    # Determine which metric to show: RCSI or specific milestone variable?
+    # We'll show RCSI as the primary gauge, and milestone as text.
+    col_names = []
+    for sid in school_ids:
         name = school_info[school_info['school_id_no'] == sid]['school_name'].values[0]
-        fig.add_trace(go.Scatter(x=hist['month'], y=hist['running_outcome'], mode='lines', name=f"{name} RCSI"), row=1, col=1)
-        fig.add_trace(go.Scatter(x=hist['month'], y=hist['milestone'], mode='lines', name=f"{name} Milestone"), row=2, col=1)
-    fig.update_layout(height=600, template='plotly_dark' if dark_mode else 'plotly_white')
-    st.plotly_chart(fig, use_container_width=True)
+        col_names.append(name)
+
+    cols = st.columns(len(school_ids))
+    for idx, sid in enumerate(school_ids):
+        with cols[idx]:
+            hist = history_per_school.get(sid)
+            if hist and hist.get('running_outcome'):
+                rcsi = hist['running_outcome'][-1] if hist['running_outcome'] else 0.0
+                milestone = hist['milestone'][-1] if hist['milestone'] else 0
+                milestone_name = MILESTONE_NAMES.get(milestone, f"M{milestone}")
+                fig = create_rcsi_gauge(rcsi, f"{col_names[idx]}\nRCSI", dark_mode)
+                st.plotly_chart(fig, use_container_width=True)
+                st.caption(f"**Milestone:** {milestone_name}")
+                st.caption(f"**Level:** {classify_rcsi(rcsi)}")
+            else:
+                st.write(f"No simulation data for {col_names[idx]}")
 
 
 # ============================================================
@@ -1042,6 +1090,10 @@ with st.sidebar:
     st.markdown(f"<h2 style='color: {USTP_DARK_BLUE};'>Controls</h2>", unsafe_allow_html=True)
     dark_mode = st.checkbox("Dark Mode", value=False)
     apply_theme(dark_mode)
+
+    # Role selector (restored)
+    user_role = st.radio("User Role", options=["Principal", "Division Head"], index=0,
+                         help="Principal sees only the selected school. Division Head sees division-level aggregates.")
 
     st.metric("Total Schools Loaded", st.session_state.num_schools)
     st.metric("Total Teachers Recorded", st.session_state.total_teachers)
@@ -1146,7 +1198,20 @@ if survey_file is not None and metadata_file is not None:
         selected_school_id = label_to_id[selected_school_label]
         selected_school_name = id_to_label[selected_school_id].split(": ", 1)[1]
 
-        # Baseline section
+        # ------------------------------------------------------------------
+        # ROLE-BASED FILTERING
+        # ------------------------------------------------------------------
+        if user_role == "Principal":
+            # Only show the selected school
+            display_school_ids = [selected_school_id]
+            show_div_data = False
+        else:  # Division Head
+            display_school_ids = school_ids
+            show_div_data = True
+
+        # ------------------------------------------------------------------
+        # BASELINE SECTION
+        # ------------------------------------------------------------------
         st.markdown("<h2 style='text-align: center;'>Baseline from Uploaded Data</h2>", unsafe_allow_html=True)
         st.markdown("---")
         st.markdown("### Research Outputs (Recent)")
@@ -1158,62 +1223,103 @@ if survey_file is not None and metadata_file is not None:
 
         latest = get_latest_survey(survey_df, selected_school_id)
         if latest is not None:
-            col_left, col_right = st.columns([1, 5])
-            with col_left:
-                st.markdown("**Legend:**")
-                legend_items = "\n".join(f"- **{v} ({MILESTONE_SHORT[i]})** → {MILESTONE_NAMES[i]}" for i, v in enumerate(VARIABLES))
-                st.markdown(f'<div style="font-size: 12px;">{legend_items}</div>', unsafe_allow_html=True)
-            with col_right:
-                survey_tuple = tuple(latest[v] for v in VARIABLES)
-                # Compute baseline RCSI as mean of the seven variables
-                baseline_rcsi = np.mean(survey_tuple)
-                radar_fig = build_radar_chart(survey_tuple, selected_school_name, dark_mode,
-                                              rcsi=baseline_rcsi, threshold=0.8)
-                st.plotly_chart(radar_fig, use_container_width=True)
-                get_figure_download_link(radar_fig, "radar_chart.html", "Download Radar Chart")
+            # ---- Gauges for the 7 variables ----
+            st.markdown("### Current Research Culture Profile (7 Variables)")
+            cols = st.columns(4)
+            var_cols = ['R', 'A', 'C', 'S', 'I', 'P', 'M']
+            for i, var in enumerate(var_cols):
+                if i < 4:
+                    with cols[i]:
+                        val = latest[var]
+                        # Add threshold for Awareness (A) only
+                        thresh = 0.8 if var == 'A' else None
+                        fig = create_gauge(val, VAR_FULL_NAMES[var], threshold=thresh, dark_mode=dark_mode)
+                        st.plotly_chart(fig, use_container_width=True)
+                        # Interpretation text
+                        level = classify_rcsi(val)
+                        st.caption(f"**{level}**")
+                else:
+                    if i == 4:
+                        cols2 = st.columns(3)
+                    idx2 = i - 4
+                    with cols2[idx2]:
+                        val = latest[var]
+                        thresh = 0.8 if var == 'A' else None
+                        fig = create_gauge(val, VAR_FULL_NAMES[var], threshold=thresh, dark_mode=dark_mode)
+                        st.plotly_chart(fig, use_container_width=True)
+                        level = classify_rcsi(val)
+                        st.caption(f"**{level}**")
+
+            # ---- RCSI Gauges: School vs Division (side-by-side) ----
+            st.markdown("### School & Division RCSI Comparison")
+            rcsi_school = np.mean([latest[v] for v in VARIABLES])
+            rcsi_division = np.mean([np.mean([survey_df[survey_df['school_id_no']==sid][v].iloc[-1] if not survey_df[survey_df['school_id_no']==sid].empty else 0.0 for v in VARIABLES]) for sid in school_ids]) if show_div_data else rcsi_school
+
+            col_r1, col_r2 = st.columns(2)
+            with col_r1:
+                fig1 = create_rcsi_gauge(rcsi_school, f"{selected_school_name}\nRCSI", dark_mode)
+                st.plotly_chart(fig1, use_container_width=True)
+                st.caption(f"**Level:** {classify_rcsi(rcsi_school)}")
+            with col_r2:
+                if show_div_data:
+                    fig2 = create_rcsi_gauge(rcsi_division, "Division Average RCSI", dark_mode)
+                    st.plotly_chart(fig2, use_container_width=True)
+                    st.caption(f"**Level:** {classify_rcsi(rcsi_division)}")
+                else:
+                    st.info("Switch to Division Head role to see division average.")
+
+            # ---- Utilisation Gauges: School vs Division ----
+            st.markdown("### Research Utilisation Rate")
+            school_meta = metadata_df[metadata_df['school_id_no'] == selected_school_id]
+            school_util = (school_meta['utilized_by_school'].sum() / len(school_meta) * 100) if len(school_meta) > 0 else 0.0
+            div_util = (metadata_df['utilized_by_school'].sum() / len(metadata_df) * 100) if len(metadata_df) > 0 else 0.0
+
+            col_u1, col_u2 = st.columns(2)
+            with col_u1:
+                fig_u1 = create_utilisation_gauge(school_util, f"{selected_school_name}\nUtilisation", dark_mode)
+                st.plotly_chart(fig_u1, use_container_width=True)
+                st.caption(f"**{classify_utilisation(school_util)}**")
+            with col_u2:
+                if show_div_data:
+                    fig_u2 = create_utilisation_gauge(div_util, "Division Utilisation", dark_mode)
+                    st.plotly_chart(fig_u2, use_container_width=True)
+                    st.caption(f"**{classify_utilisation(div_util)}**")
+                else:
+                    st.info("Switch to Division Head role to see division utilisation.")
+
+            # ---- Baseline Synopsis ----
+            if 'baseline_synopsis' not in st.session_state:
+                with st.spinner("Generating baseline synopsis..."):
+                    time.sleep(0.5)
+                    st.session_state.baseline_synopsis = generate_baseline_synopsis(latest, selected_school_name, metadata_df)
+                    st.session_state.baseline_survey_row = latest.to_dict()
+                    school_survey = survey_df[survey_df['school_id_no'] == selected_school_id]
+                    st.session_state.baseline_std_devs = {v: school_survey[v].std() if len(school_survey) > 1 else 0.1 for v in VARIABLES}
+                    st.rerun()
+
+            if 'baseline_synopsis' in st.session_state:
+                bs = st.session_state.baseline_synopsis
+                bg_color = '#2E2E2E' if dark_mode else '#E3F2FD'
+                text_col = DARK_TEXT if dark_mode else 'inherit'
+                st.markdown("### Baseline Synopsis")
+                st.markdown(f"""
+                <div style="background-color: {bg_color}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
+                <b>School: {selected_school_name}</b><br>
+                Baseline RCSI: {bs['baseline_rcsi']:.3f}<br>
+                Strengths (≥0.6): {', '.join(bs['strengths']) if bs['strengths'] else 'None'}<br>
+                Critical Gaps (≤0.3): {', '.join(bs['gaps']) if bs['gaps'] else 'None'}<br>
+                Moderate (0.3–0.6): {', '.join(bs['moderate']) if bs['moderate'] else 'None'}<br>
+                Actionable Recommendations:<br>{'<br>'.join(bs['recommendations'])}
+                </div>
+                """, unsafe_allow_html=True)
+
         else:
             st.info("No survey data for current quarter.")
 
-        with st.expander("Research Outputs Dashboard"):
-            metrics = _compute_research_metrics(metadata_df, selected_school_id)
-            figs = render_research_dashboard(metrics, selected_school_name, dark_mode)
-            if figs:
-                for name, fig in figs.items():
-                    st.plotly_chart(fig, use_container_width=True)
-                    get_figure_download_link(fig, f"{name}.html")
-                st.metric("School-level Research Utilisation Rate",
-                          f"{metrics.get('util_rate', 0):.1f}% → {metrics.get('util_level', 'N/A')} level",
-                          help=metrics.get('util_desc', ''))
-
-        # Auto-generate baseline synopsis
-        if 'baseline_synopsis' not in st.session_state and latest is not None:
-            with st.spinner("Generating baseline synopsis..."):
-                time.sleep(0.5)
-                st.session_state.baseline_synopsis = generate_baseline_synopsis(latest, selected_school_name, metadata_df)
-                st.session_state.baseline_survey_row = latest.to_dict()
-                school_survey = survey_df[survey_df['school_id_no'] == selected_school_id]
-                st.session_state.baseline_std_devs = {v: school_survey[v].std() if len(school_survey) > 1 else 0.1 for v in VARIABLES}
-                st.rerun()
-
-        if 'baseline_synopsis' in st.session_state:
-            bs = st.session_state.baseline_synopsis
-            bg_color = '#2E2E2E' if dark_mode else '#E3F2FD'
-            text_col = DARK_TEXT if dark_mode else 'inherit'
-            st.markdown("### Baseline Synopsis")
-            st.markdown(f"""
-            <div style="background-color: {bg_color}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
-            <b>School: {selected_school_name}</b><br>
-            Baseline RCSI: {bs['baseline_rcsi']:.3f}<br>
-            Strengths (≥0.6): {', '.join(bs['strengths']) if bs['strengths'] else 'None'}<br>
-            Critical Gaps (≤0.3): {', '.join(bs['gaps']) if bs['gaps'] else 'None'}<br>
-            Moderate (0.3–0.6): {', '.join(bs['moderate']) if bs['moderate'] else 'None'}<br>
-            Actionable Recommendations:<br>{'<br>'.join(bs['recommendations'])}
-            </div>
-            """, unsafe_allow_html=True)
-
+        # ---- Heatmap ----
         baseline_heatmap(survey_df, metadata_df, dark_mode)
 
-        # ---------- Phase 2: Calibration ----------
+        # ---- Calibration ----
         if 'calibrated_coeff' not in st.session_state:
             with st.spinner("Calibrating model coefficients from data..."):
                 time.sleep(0.5)
@@ -1236,14 +1342,14 @@ if survey_file is not None and metadata_file is not None:
 
         agent_params = get_agent_params(school_ids, survey_df, metadata_df, st.session_state.calibrated_coeff)
 
-        # ---------- Initialize Simulation ----------
+        # ---- Simulation Initialization ----
         if 'sim' not in st.session_state:
             st.session_state.sim = init_simulation_with_data(school_ids, metadata_df, random_events, agent_params)
             st.session_state.current_month = 0
             st.session_state.total_months = 0
             st.session_state.history = create_empty_history(school_ids)
 
-        # ---------- Run / Step / Reset ----------
+        # ---- Run / Step / Reset ----
         if run_btn:
             st.session_state.sim = init_simulation_with_data(school_ids, metadata_df, random_events, agent_params)
             st.session_state.current_month = 0; st.session_state.total_months = 0
@@ -1280,7 +1386,7 @@ if survey_file is not None and metadata_file is not None:
             st.session_state.history = create_empty_history(school_ids)
             st.rerun()
 
-        # ---------- Simulation Results ----------
+        # ---- Simulation Results ----
         if st.session_state.total_months > 0:
             text_col = DARK_TEXT if dark_mode else 'inherit'
 
@@ -1289,7 +1395,7 @@ if survey_file is not None and metadata_file is not None:
             hist = st.session_state.history.get(selected_school_id)
             agent = next((a for a in st.session_state.sim.agents if a.real_id == selected_school_id), None)
             if hist and agent:
-                # Main 4-panel chart
+                # ---- Main simulation charts (with axis labels) ----
                 fig1 = make_subplots(rows=2, cols=2, subplot_titles=("Variable Evolution", "Milestone Progress",
                                                                      "Research Culture Sustainability Index (RCSI)",
                                                                      "Improvement per Completed Cycle"))
@@ -1309,19 +1415,57 @@ if survey_file is not None and metadata_file is not None:
                     fig1.add_annotation(text="No cycles completed yet", xref="x2 domain", yref="y2 domain",
                                         x=0.5, y=0.5, showarrow=False, row=2, col=2)
                 template = 'plotly_dark' if dark_mode else 'plotly_white'
-                fig1.update_layout(height=800, showlegend=True, font=dict(color=text_col), template=template)
+                fig1.update_layout(height=800, showlegend=True, font=dict(color=text_col), template=template,
+                                   xaxis_title="Month", yaxis_title="Value",
+                                   xaxis2_title="Month", yaxis2_title="Milestone",
+                                   xaxis3_title="Month", yaxis3_title="RCSI",
+                                   xaxis4_title="Cycle Number", yaxis4_title="RCSI per Cycle")
                 st.plotly_chart(fig1, use_container_width=True)
                 get_figure_download_link(fig1, "simulation_overview.html", "Download Simulation Charts")
 
-                # ---- Show simulated radar chart with RCSI ring ----
-                final_values = [hist[var][-1] for var in VARIABLES] if hist else None
-                if final_values:
-                    final_rcsi = agent.running_total_outcome
-                    radar_sim_fig = build_radar_chart(tuple(final_values), f"{selected_school_name} (Simulated)",
-                                                      dark_mode, rcsi=final_rcsi, threshold=0.8)
-                    st.plotly_chart(radar_sim_fig, use_container_width=True)
-                    get_figure_download_link(radar_sim_fig, "radar_simulated.html", "Download Simulated Radar Chart")
+                # ---- Simulated Gauges (Final state) ----
+                st.markdown("### Simulated Current State (Final Month)")
+                final_vals = [getattr(agent, v) for v in VARIABLES]
+                cols_g = st.columns(4)
+                for i, var in enumerate(VARIABLES):
+                    if i < 4:
+                        with cols_g[i]:
+                            val = final_vals[i]
+                            thresh = 0.8 if var == 'A' else None
+                            fig = create_gauge(val, VAR_FULL_NAMES[var], threshold=thresh, dark_mode=dark_mode)
+                            st.plotly_chart(fig, use_container_width=True)
+                            level = classify_rcsi(val)
+                            st.caption(f"**{level}**")
+                    else:
+                        if i == 4:
+                            cols_g2 = st.columns(3)
+                        idx2 = i - 4
+                        with cols_g2[idx2]:
+                            val = final_vals[i]
+                            thresh = 0.8 if var == 'A' else None
+                            fig = create_gauge(val, VAR_FULL_NAMES[var], threshold=thresh, dark_mode=dark_mode)
+                            st.plotly_chart(fig, use_container_width=True)
+                            level = classify_rcsi(val)
+                            st.caption(f"**{level}**")
 
+                # ---- Final RCSI gauge ----
+                final_rcsi = agent.running_total_outcome
+                st.markdown("### Final RCSI")
+                col_f1, col_f2 = st.columns(2)
+                with col_f1:
+                    fig_rcsi_final = create_rcsi_gauge(final_rcsi, f"{selected_school_name}\nFinal RCSI", dark_mode)
+                    st.plotly_chart(fig_rcsi_final, use_container_width=True)
+                    st.caption(f"**Level:** {classify_rcsi(final_rcsi)}")
+                with col_f2:
+                    if show_div_data:
+                        div_rcsi_final = np.mean([a.running_total_outcome for a in st.session_state.sim.agents])
+                        fig_div_rcsi = create_rcsi_gauge(div_rcsi_final, "Division Avg Final RCSI", dark_mode)
+                        st.plotly_chart(fig_div_rcsi, use_container_width=True)
+                        st.caption(f"**Level:** {classify_rcsi(div_rcsi_final)}")
+                    else:
+                        st.info("Switch to Division Head role for division average.")
+
+                # ---- Other expanders ----
                 with st.expander("Cycle vs Research Outputs"):
                     cycle_research_correlation(agent, metadata_df, selected_school_id, dark_mode)
 
@@ -1329,13 +1473,24 @@ if survey_file is not None and metadata_file is not None:
                     div_metrics = division_level_analysis(metadata_df, st.session_state.history,
                                                           st.session_state.sim.agents, dark_mode)
 
-                with st.expander("Comparative School Analysis"):
-                    selected_comparison = st.multiselect("Select schools to compare", options=school_ids,
-                                                         format_func=lambda x: id_to_label[x])
-                    school_comparison_dashboard(survey_df, st.session_state.history, school_info,
-                                                selected_comparison, dark_mode)
+                # ---- Comparative School Analysis (gauges with dropdown) ----
+                with st.expander("Comparative School Analysis (Gauges)"):
+                    # Limit to 3 schools
+                    comp_options = [sid for sid in school_ids if sid != selected_school_id]
+                    comp_options = [selected_school_id] + comp_options
+                    selected_comparison = st.multiselect(
+                        "Select 2-3 schools to compare",
+                        options=comp_options,
+                        format_func=lambda x: id_to_label[x],
+                        default=comp_options[:2] if len(comp_options) >= 2 else comp_options
+                    )
+                    if len(selected_comparison) >= 2:
+                        school_comparison_gauge(selected_comparison, school_info, st.session_state.history,
+                                                dark_mode)
+                    else:
+                        st.info("Select at least 2 schools for comparison.")
 
-                # ---------- Sensitivity & Monte Carlo ----------
+                # ---- Sensitivity ----
                 sensitivity_info = ""
                 if not st.session_state.get('sensitivity_fig'):
                     with st.spinner("Computing sensitivity analysis..."):
@@ -1354,6 +1509,7 @@ if survey_file is not None and metadata_file is not None:
                     if sensitivity_info:
                         st.markdown(sensitivity_info)
 
+                # ---- Monte Carlo ----
                 if 'mc_data' in st.session_state:
                     with st.expander("Monte Carlo Uncertainty Bands"):
                         mc_data = st.session_state.mc_data
@@ -1379,7 +1535,7 @@ if survey_file is not None and metadata_file is not None:
                             else:
                                 st.info("Not enough Monte Carlo runs for causal analysis (need >10).")
 
-                # ===== School-Level Synopsis =====
+                # ---- School Synopsis ----
                 rcsi_val = agent.running_total_outcome
                 rcsi_level = classify_rcsi(rcsi_val)
                 milestone_name = MILESTONE_NAMES.get(agent.current_milestone, f"Milestone {agent.current_milestone}")
@@ -1397,7 +1553,6 @@ if survey_file is not None and metadata_file is not None:
                     milestone_progress = "has established structured support and is embedding research into institutional practice."
                 else:
                     milestone_progress = "is realising tangible impact and is approaching or has achieved cyclical sustainability."
-                key_R = hist['R'][-1] if hist['R'] else 0; key_M = hist['M'][-1] if hist['M'] else 0
 
                 sens_text = sensitivity_info if sensitivity_info else ""
                 mc_text = st.session_state.get('mc_info', "")
@@ -1406,40 +1561,10 @@ if survey_file is not None and metadata_file is not None:
                 gap = rcsi_val - avg_rcsi_division
                 gap_text = f"Compared to the division average of **{avg_rcsi_division:.3f}**, this school is **{gap:+.3f}** points {'above' if gap > 0 else 'below'} the division average."
 
-                output_trend_text = ""
-                tl = metrics.get('output_timeline')
-                if tl is not None and len(tl) >= 2:
-                    if tl.iloc[-1]['count'] > tl.iloc[-2]['count']:
-                        output_trend_text = "Research output is increasing over time."
-                    elif tl.iloc[-1]['count'] < tl.iloc[-2]['count']:
-                        output_trend_text = "Research output is declining over time."
-                    else:
-                        output_trend_text = "Research output has remained stable."
-                    avg_output = tl['count'].mean()
-                    output_trend_text += f" On average, the school produces {avg_output:.1f} outputs per quarter."
-
-                theme_util_text = ""
-                tu = metrics.get('theme_util_df')
-                if tu is not None and not tu.empty:
-                    max_util = tu.loc[tu['Utilisation Rate'].idxmax()]
-                    min_util = tu.loc[tu['Utilisation Rate'].idxmin()]
-                    theme_util_text = (f"The most utilised theme is '{max_util['Theme']}' "
-                                       f"({max_util['Utilisation Rate']:.0%}), while "
-                                       f"'{min_util['Theme']}' has the lowest adoption "
-                                       f"({min_util['Utilisation Rate']:.0%}).")
-
-                top_teacher_text = f"The school's top researcher is {metrics['top_teacher']}." if metrics.get('top_teacher') != "N/A" else ""
-
                 bg_col = '#2E2E2E' if dark_mode else '#E3F2FD'
                 synopsis = f"""
                 After {st.session_state.total_months} months, {selected_school_name} (ID {selected_school_id}) has reached {milestone_name} and {cycle_text}
                 The school's Research Culture Sustainability Index (RCSI) is <b>{rcsi_val:.3f}</b>, which falls into the <b>{rcsi_level}</b> level.
-                Key indicators: Readiness (R) = {key_R:.2f}, Impact (M) = {key_M:.2f}, and current Milestone = {agent.current_milestone}.
-                This combination suggests that {milestone_progress}
-                The RCSI level <b>{rcsi_level.lower()}</b> reinforces this assessment.
-                {output_trend_text}
-                {theme_util_text}
-                {top_teacher_text}
                 {sens_text}
                 {mc_text}
                 {gap_text}
@@ -1452,7 +1577,7 @@ if survey_file is not None and metadata_file is not None:
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Baseline vs Simulation comparison
+                # ---- Baseline vs Simulation comparison ----
                 if ('baseline_synopsis' in st.session_state and 'baseline_survey_row' in st.session_state):
                     bs = st.session_state.baseline_synopsis
                     baseline_vals = st.session_state.baseline_survey_row
@@ -1482,90 +1607,91 @@ if survey_file is not None and metadata_file is not None:
                             })
                         st.table(pd.DataFrame(table_data))
 
-                # ===== Division-Level Synopsis =====
-                total_schools = len(st.session_state.sim.agents)
-                early_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
-                advanced_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
-                transitional = total_schools - early_stage - advanced_stage
-                early_percent = (early_stage / total_schools * 100) if total_schools > 0 else 0
-                advanced_percent = (advanced_stage / total_schools * 100) if total_schools > 0 else 0
-                transitional_percent = (transitional / total_schools * 100) if total_schools > 0 else 0
-                early_text = f"{early_percent:.1f}% of schools" if early_percent > 0 else "No schools"
-                advanced_text = f"{advanced_percent:.1f}% of schools" if advanced_percent > 0 else "No schools"
-                if early_percent == 100:
-                    sustainability_text = "All schools are in early milestones; foundational capacity‑building is the priority."
-                elif early_percent >= 75:
-                    sustainability_text = f"The vast majority ({early_percent:.1f}%) are in early milestones; urgent interventions needed."
-                elif early_percent >= 50:
-                    sustainability_text = f"More than half ({early_percent:.1f}%) are in early milestones; targeted policy support may accelerate progress."
-                elif early_percent > 0:
-                    sustainability_text = f"{early_percent:.1f}% remain in early milestones; continued efforts are required."
-                else:
-                    sustainability_text = "No schools are in early milestones; the division exhibits a strong, advanced research culture."
+                # ---- Division Synopsis ----
+                if show_div_data:
+                    total_schools = len(st.session_state.sim.agents)
+                    early_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
+                    advanced_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone >= 4)
+                    transitional = total_schools - early_stage - advanced_stage
+                    early_percent = (early_stage / total_schools * 100) if total_schools > 0 else 0
+                    advanced_percent = (advanced_stage / total_schools * 100) if total_schools > 0 else 0
+                    transitional_percent = (transitional / total_schools * 100) if total_schools > 0 else 0
+                    early_text = f"{early_percent:.1f}% of schools" if early_percent > 0 else "No schools"
+                    advanced_text = f"{advanced_percent:.1f}% of schools" if advanced_percent > 0 else "No schools"
+                    if early_percent == 100:
+                        sustainability_text = "All schools are in early milestones; foundational capacity‑building is the priority."
+                    elif early_percent >= 75:
+                        sustainability_text = f"The vast majority ({early_percent:.1f}%) are in early milestones; urgent interventions needed."
+                    elif early_percent >= 50:
+                        sustainability_text = f"More than half ({early_percent:.1f}%) are in early milestones; targeted policy support may accelerate progress."
+                    elif early_percent > 0:
+                        sustainability_text = f"{early_percent:.1f}% remain in early milestones; continued efforts are required."
+                    else:
+                        sustainability_text = "No schools are in early milestones; the division exhibits a strong, advanced research culture."
 
-                total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
-                avg_rcsi = total_outcome / total_schools if total_schools > 0 else 0
-                level_avg = classify_rcsi(avg_rcsi)
-                total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
-                avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
-                avg_milestone_interp = interpret_avg_milestone(avg_milestone)
+                    total_outcome = sum(a.running_total_outcome for a in st.session_state.sim.agents)
+                    avg_rcsi_div = total_outcome / total_schools if total_schools > 0 else 0
+                    level_avg = classify_rcsi(avg_rcsi_div)
+                    total_cycles = sum(a.cycle_count for a in st.session_state.sim.agents)
+                    avg_milestone = np.mean([a.current_milestone for a in st.session_state.sim.agents])
+                    avg_milestone_interp = interpret_avg_milestone(avg_milestone)
 
-                school_ids_in_sim = [a.real_id for a in st.session_state.sim.agents]
-                div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
-                total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
-                total_research = len(div_metadata)
-                div_util_rate = (total_utilised / total_research * 100) if total_research > 0 else 0
+                    school_ids_in_sim = [a.real_id for a in st.session_state.sim.agents]
+                    div_metadata = metadata_df[metadata_df['school_id_no'].isin(school_ids_in_sim)]
+                    total_utilised = div_metadata['utilized_by_school'].sum() if 'utilized_by_school' in div_metadata.columns else 0
+                    total_research = len(div_metadata)
+                    div_util_rate = (total_utilised / total_research * 100) if total_research > 0 else 0
 
-                top_div_teacher = div_metrics.get('top_div_teacher', 'N/A')
-                top_div_school = div_metrics.get('top_div_school', 'N/A')
-                top_div_outputs = div_metrics.get('top_div_outputs', 0)
-                bottleneck_milestone = div_metrics.get('bottleneck_milestone', 'N/A')
-                bottleneck_time = div_metrics.get('bottleneck_time', 0)
+                    top_div_teacher = div_metrics.get('top_div_teacher', 'N/A')
+                    top_div_school = div_metrics.get('top_div_school', 'N/A')
+                    top_div_outputs = div_metrics.get('top_div_outputs', 0)
+                    bottleneck_milestone = div_metrics.get('bottleneck_milestone', 'N/A')
+                    bottleneck_time = div_metrics.get('bottleneck_time', 0)
 
-                output_trend_div = ""
-                if not metadata_df.empty and 'upload_date' in metadata_df.columns:
-                    div_timeline = metadata_df.groupby(metadata_df['upload_date'].dt.to_period('Q')).size()
-                    if len(div_timeline) >= 2:
-                        if div_timeline.iloc[-1] > div_timeline.iloc[-2]:
-                            output_trend_div = "The division's research output is increasing over time."
-                        elif div_timeline.iloc[-1] < div_timeline.iloc[-2]:
-                            output_trend_div = "The division's research output is declining over time."
-                        else:
-                            output_trend_div = "The division's research output has remained stable."
-                        avg_div_output = div_timeline.mean()
-                        output_trend_div += f" On average, the division produces {avg_div_output:.1f} outputs per quarter."
+                    output_trend_div = ""
+                    if not metadata_df.empty and 'upload_date' in metadata_df.columns:
+                        div_timeline = metadata_df.groupby(metadata_df['upload_date'].dt.to_period('Q')).size()
+                        if len(div_timeline) >= 2:
+                            if div_timeline.iloc[-1] > div_timeline.iloc[-2]:
+                                output_trend_div = "The division's research output is increasing over time."
+                            elif div_timeline.iloc[-1] < div_timeline.iloc[-2]:
+                                output_trend_div = "The division's research output is declining over time."
+                            else:
+                                output_trend_div = "The division's research output has remained stable."
+                            avg_div_output = div_timeline.mean()
+                            output_trend_div += f" On average, the division produces {avg_div_output:.1f} outputs per quarter."
 
-                full_bottleneck = MILESTONE_NAMES.get(
-                    int(bottleneck_milestone.replace('M', '')) if isinstance(bottleneck_milestone, str) and bottleneck_milestone.startswith('M') else 0,
-                    bottleneck_milestone
-                )
-                bottleneck_insight = (f"Schools spend the most time on average in {full_bottleneck} ({bottleneck_time:.1f} months). This is the critical bottleneck." if bottleneck_milestone != "N/A" else "")
-                top_teacher_insight = (f"The division's top researcher is {top_div_teacher} from {top_div_school} with {top_div_outputs} outputs." if top_div_teacher != "N/A" else "")
+                    full_bottleneck = MILESTONE_NAMES.get(
+                        int(bottleneck_milestone.replace('M', '')) if isinstance(bottleneck_milestone, str) and bottleneck_milestone.startswith('M') else 0,
+                        bottleneck_milestone
+                    )
+                    bottleneck_insight = (f"Schools spend the most time on average in {full_bottleneck} ({bottleneck_time:.1f} months). This is the critical bottleneck." if bottleneck_milestone != "N/A" else "")
+                    top_teacher_insight = (f"The division's top researcher is {top_div_teacher} from {top_div_school} with {top_div_outputs} outputs." if top_div_teacher != "N/A" else "")
 
-                div_mc_text = ""
-                if 'mc_data' in st.session_state:
-                    mc_finals = st.session_state.mc_data['final_rcsi']
-                    div_mc_text = (f"Monte Carlo projections suggest that the division's average RCSI is estimated around "
-                                   f"**{np.mean(mc_finals):.3f}** with a P10‑P90 range of "
-                                   f"**{np.percentile(mc_finals, 10):.3f}** – **{np.percentile(mc_finals, 90):.3f}**, "
-                                   f"indicating that the division as a whole exhibits low variance and stable sustainability.")
+                    div_mc_text = ""
+                    if 'mc_data' in st.session_state:
+                        mc_finals = st.session_state.mc_data['final_rcsi']
+                        div_mc_text = (f"Monte Carlo projections suggest that the division's average RCSI is estimated around "
+                                       f"**{np.mean(mc_finals):.3f}** with a P10‑P90 range of "
+                                       f"**{np.percentile(mc_finals, 10):.3f}** – **{np.percentile(mc_finals, 90):.3f}**, "
+                                       f"indicating that the division as a whole exhibits low variance and stable sustainability.")
 
-                bg_div = '#2E2E2E' if dark_mode else '#E8F5E9'
-                st.markdown(f"""
-                <div style="background-color: {bg_div}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
-                <b>Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
-                - Average milestone = {avg_milestone:.1f} → {avg_milestone_interp}<br>
-                - Total completed cycles = {total_cycles}<br>
-                - Average RCSI = <b>{avg_rcsi:.3f}</b> → <b>{level_avg}</b> level.<br>
-                - Average research utilisation rate = <b>{div_util_rate:.1f}%</b>.<br>
-                - Stage distribution: {early_text} are in early stages (M≤2), {transitional_percent:.1f}% transitional (M3), and {advanced_text} are advanced (M≥4).<br>
-                <i>Division‑wide sustainability assessment:</i> {sustainability_text}<br><br>
-                <b>Productivity:</b> {output_trend_div}<br>
-                <b>Bottleneck:</b> {bottleneck_insight}<br>
-                <b>Top Division Researcher:</b> {top_teacher_insight}<br>
-                {div_mc_text}
-                </div>
-                """, unsafe_allow_html=True)
+                    bg_div = '#2E2E2E' if dark_mode else '#E8F5E9'
+                    st.markdown(f"""
+                    <div style="background-color: {bg_div}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
+                    <b>Division‑Level Sustainability Synopsis (all {total_schools} schools)</b><br>
+                    - Average milestone = {avg_milestone:.1f} → {avg_milestone_interp}<br>
+                    - Total completed cycles = {total_cycles}<br>
+                    - Average RCSI = <b>{avg_rcsi_div:.3f}</b> → <b>{level_avg}</b> level.<br>
+                    - Average research utilisation rate = <b>{div_util_rate:.1f}%</b>.<br>
+                    - Stage distribution: {early_text} are in early stages (M≤2), {transitional_percent:.1f}% transitional (M3), and {advanced_text} are advanced (M≥4).<br>
+                    <i>Division‑wide sustainability assessment:</i> {sustainability_text}<br><br>
+                    <b>Productivity:</b> {output_trend_div}<br>
+                    <b>Bottleneck:</b> {bottleneck_insight}<br>
+                    <b>Top Division Researcher:</b> {top_teacher_insight}<br>
+                    {div_mc_text}
+                    </div>
+                    """, unsafe_allow_html=True)
 
                 with st.expander("Graph Interpretations"):
                     st.markdown("""
@@ -1573,16 +1699,15 @@ if survey_file is not None and metadata_file is not None:
                     - **Milestone Progress:** The school moves through milestones 0-6. Reaching milestone 6 and cycling back indicates a full sustainable cycle.
                     - **RCSI:** Cumulative strength of the research ecosystem, derived from Impact Realization (M) and Collaboration (P).
                     - **Improvement per Cycle:** Each bar shows the RCSI contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
-                    - **Radar Chart:** Current snapshot of the seven milestone-linked variables. The dashed red ring marks the M0 threshold (Awareness ≥ 0.8); the solid blue ring shows the current RCSI.
+                    - **Gauges:** Each variable is shown as a speedometer-style gauge with an interpretation label underneath. The Awareness gauge includes a red threshold marker at 0.8 (M0→M1).
                     - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, experience vs output, timeline, top teachers, and breakdown by rank and attainment.
                     - **Sensitivity Tornado:** Shows which policy lever most influences the final RCSI when varied ±10%.
                     - **Monte Carlo Bands:** Depicts the uncertainty range (P10‑P90) of RCSI and milestone trajectories over multiple simulation runs.
                     - **Division‑Level Analysis:** Milestone transition bottlenecks and teacher leaderboard.
-                    - **Comparative Analysis:** Overlay multiple schools' RCSI and milestone progress.
-                    - **Cycle vs Research Outputs:** Shows how research output accumulation relates to cycle progression.
+                    - **Comparative Analysis:** Compares up to 3 schools using RCSI gauges.
                     """)
 
-            # Export
+            # ---- Export ----
             if export_btn:
                 all_data = []
                 for a in st.session_state.sim.agents:
