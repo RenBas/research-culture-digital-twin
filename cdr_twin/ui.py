@@ -1,4 +1,3 @@
-from .simulation import Simulation  # <-- ADD THIS
 # ============================================================
 # ui.py – main Streamlit user interface
 # ============================================================
@@ -18,11 +17,11 @@ from .constants import (
     VARIABLES, VAR_FULL_NAMES, VAR_INTERPRETATION, MILESTONE_NAMES,
     VAR_COLORS, RCSI_LEVELS
 )
-from .utils import classify_rcsi, interpret_avg_milestone, get_rcsi_interpretation_table, create_glossary
+from .utils import classify_rcsi, interpret_avg_milestone, get_rcsi_interpretation_table, create_glossary, classify_utilisation
 from .gauges import create_gauge, create_utilisation_gauge, create_rcsi_gauge, display_gauge_with_interpretation
 from .data import process_survey, process_metadata, get_latest_survey
 from .metrics import _compute_research_metrics
-from .simulation import create_empty_history, init_simulation_with_data, record_history, apply_survey_override
+from .simulation import Simulation, create_empty_history, init_simulation_with_data, record_history, apply_survey_override
 from .analysis import generate_baseline_synopsis, baseline_heatmap, cycle_research_correlation, division_level_analysis, school_comparison_gauge
 from .monte_carlo import calibrate_coefficients, get_agent_params, run_sensitivity, monte_carlo_sim, plot_monte_carlo_bands, causal_analysis
 
