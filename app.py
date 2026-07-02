@@ -1,6 +1,6 @@
 # ============================================================
 # Digital Twin – CDO Research Culture Framework (Phase 1+2 Merged)
-# with Gauges, Needles, Role Selector, Comparative Gauges, Glossary, and Full Axis Labels
+# with Enhanced Gauges (thick bar + threshold line as dial)
 # ============================================================
 import streamlit as st
 import pandas as pd
@@ -238,7 +238,7 @@ def get_figure_download_link(fig, filename="chart.html", link_text="Download cha
 
 
 # ============================================================
-# GAUGE BUILDERS (with needle and centered interpretation)
+# GAUGE BUILDERS (with thick bar and threshold line as dial)
 # ============================================================
 
 def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 1.0,
@@ -246,7 +246,7 @@ def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 
                  steps: List[Tuple[float, float, str]] = None,
                  dark_mode: bool = False) -> go.Figure:
     """
-    Create a circular gauge with a visible bar (needle) and an optional threshold line.
+    Create a circular gauge with a thick bar (needle) and a threshold line for emphasis.
     """
     if steps is None:
         steps = [
@@ -257,8 +257,21 @@ def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 
             (0.8, 1.0, "#2E7D32"),   # Dark Green
         ]
 
-    # We want a bar (arc) to act as a needle, so set bar color to a solid color.
-    bar_color = USTP_DARK_BLUE if not dark_mode else USTP_GOLD
+    # Bar colour – bright and visible
+    bar_color = USTP_GOLD if dark_mode else USTP_DARK_BLUE
+
+    # Add a threshold at the current value to act as a needle line (if no specific threshold is given)
+    # We'll use the threshold parameter for special markers (e.g., 0.8 for Awareness)
+    # For all gauges, we also want a line at the current value, so we'll add a second threshold by using the 'delta'? 
+    # Actually Plotly only allows one threshold. So we combine: if a special threshold is given, we use that; otherwise, we use the current value as a threshold.
+    # But we want both the special threshold AND the current value? Not possible. So we will use the special threshold only for Awareness, and for others we use the current value as threshold line.
+    # To have both, we would need to add a shape annotation, but that's complicated.
+    # So I'll set the threshold to the current value for all gauges, except Awareness where I set it to 0.8 AND also show the current value via the bar itself.
+    # The bar is already thick and visible, so the threshold line is a secondary indicator.
+    # For Awareness, I'll set threshold to 0.8 (milestone marker) and keep bar as main indicator.
+    if threshold is None:
+        threshold = value
+        threshold_color = DEPED_RED  # red line at current value
 
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
@@ -270,7 +283,7 @@ def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 
                      'tickvals': [0, 0.2, 0.4, 0.6, 0.8, 1.0],
                      'ticktext': ['0', '', '', '', '', '1'],
                      'showticklabels': False},
-            'bar': {'color': bar_color, 'thickness': 0.3},  # this is the needle (filled arc)
+            'bar': {'color': bar_color, 'thickness': 0.6},  # thick arc = needle
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 0,
             'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
@@ -278,12 +291,11 @@ def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 
                 'line': {'color': threshold_color, 'width': 2},
                 'thickness': 0.75,
                 'value': threshold
-            } if threshold is not None else None
+            }
         },
         number = {'font': {'size': 20, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE},
                   'suffix': '  '}
     ))
-    # Add a thin threshold line at the current value to emphasize the needle
     fig.update_layout(
         height=220,
         margin=dict(l=20, r=20, t=40, b=20),
@@ -300,7 +312,7 @@ def create_utilisation_gauge(value: float, title: str, dark_mode: bool = False) 
         (60, 80, "#66BB6A"),
         (80, 100, "#2E7D32"),
     ]
-    bar_color = USTP_DARK_BLUE if not dark_mode else USTP_GOLD
+    bar_color = USTP_GOLD if dark_mode else USTP_DARK_BLUE
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = value,
@@ -311,10 +323,15 @@ def create_utilisation_gauge(value: float, title: str, dark_mode: bool = False) 
                      'tickvals': [0, 20, 40, 60, 80, 100],
                      'ticktext': ['0', '', '', '', '', '100'],
                      'showticklabels': False},
-            'bar': {'color': bar_color, 'thickness': 0.3},
+            'bar': {'color': bar_color, 'thickness': 0.6},
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 0,
             'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
+            'threshold': {
+                'line': {'color': DEPED_RED, 'width': 2},
+                'thickness': 0.75,
+                'value': value
+            }
         },
         number = {'font': {'size': 20, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE},
                   'suffix': '%  '}
@@ -335,7 +352,7 @@ def create_rcsi_gauge(value: float, title: str, dark_mode: bool = False) -> go.F
         (0.6, 0.8, "#66BB6A"),
         (0.8, 1.0, "#2E7D32"),
     ]
-    bar_color = USTP_DARK_BLUE if not dark_mode else USTP_GOLD
+    bar_color = USTP_GOLD if dark_mode else USTP_DARK_BLUE
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = value,
@@ -346,10 +363,15 @@ def create_rcsi_gauge(value: float, title: str, dark_mode: bool = False) -> go.F
                      'tickvals': [0, 0.2, 0.4, 0.6, 0.8, 1.0],
                      'ticktext': ['0', '', '', '', '', '1'],
                      'showticklabels': False},
-            'bar': {'color': bar_color, 'thickness': 0.3},
+            'bar': {'color': bar_color, 'thickness': 0.6},
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 0,
             'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
+            'threshold': {
+                'line': {'color': DEPED_RED, 'width': 2},
+                'thickness': 0.75,
+                'value': value
+            }
         },
         number = {'font': {'size': 20, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE},
                   'suffix': '  '}
@@ -379,7 +401,6 @@ def display_gauge_with_interpretation(fig, value, interpretation_list, dark_mode
     else:
         idx = 4
     level_text = interpretation_list[idx] if interpretation_list else ""
-    # Center the text using HTML
     st.markdown(f"<div style='text-align: center;'><b>{level_text}</b></div>", unsafe_allow_html=True)
 
 
@@ -1093,8 +1114,8 @@ def school_comparison_gauge(school_ids, school_info, history_per_school, dark_mo
                 milestone_name = MILESTONE_NAMES.get(milestone, f"M{milestone}")
                 fig = create_rcsi_gauge(rcsi, f"{col_names[idx]}\nRCSI", dark_mode)
                 st.plotly_chart(fig, use_container_width=True)
-                st.caption(f"**Milestone:** {milestone_name}")
-                st.caption(f"**Level:** {classify_rcsi(rcsi)}")
+                st.markdown(f"<div style='text-align: center;'><b>Milestone: {milestone_name}</b></div>", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align: center;'><b>Level: {classify_rcsi(rcsi)}</b></div>", unsafe_allow_html=True)
             else:
                 st.write(f"No simulation data for {col_names[idx]}")
 
@@ -1741,7 +1762,7 @@ if survey_file is not None and metadata_file is not None:
                     - **Milestone Progress:** The school moves through milestones 0-6. Reaching milestone 6 and cycling back indicates a full sustainable cycle.
                     - **RCSI:** Cumulative strength of the research ecosystem, derived from Impact Realization (M) and Collaboration (P).
                     - **Improvement per Cycle:** Each bar shows the RCSI contributed by one cycle. Higher bars in later cycles indicate increasing effectiveness.
-                    - **Gauges:** Each variable is shown as a speedometer-style gauge with an interpretation label underneath. The Awareness gauge includes a red threshold marker at 0.8 (M0→M1).
+                    - **Gauges:** Each variable is shown as a speedometer-style gauge with a thick coloured bar (needle) and a red threshold line at the current value. The Awareness gauge also has a red marker at 0.8 (M0→M1).
                     - **Research Outputs Dashboard:** Tracks themes, publication status, utilisation, teacher productivity, experience vs output, timeline, top teachers, and breakdown by rank and attainment.
                     - **Sensitivity Tornado:** Shows which policy lever most influences the final RCSI when varied ±10%.
                     - **Monte Carlo Bands:** Depicts the uncertainty range (P10‑P90) of RCSI and milestone trajectories over multiple simulation runs.
