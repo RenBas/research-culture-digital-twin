@@ -2,6 +2,7 @@
 # analysis.py – higher-level analytical functions (synopsis, heatmap, etc.)
 # ============================================================
 
+from .data import get_latest_survey
 import numpy as np
 import pandas as pd
 import streamlit as st
