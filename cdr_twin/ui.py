@@ -1,8 +1,7 @@
+from .simulation import Simulation  # <-- ADD THIS
 # ============================================================
 # ui.py – main Streamlit user interface
 # ============================================================
-
-from .simulation import Simulation  # <-- ADD THIS
 
 import streamlit as st
 import pandas as pd
