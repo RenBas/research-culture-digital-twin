@@ -138,3 +138,120 @@ def school_comparison_gauge(school_ids, school_info, history_per_school, dark_mo
                 st.markdown(f"<div style='text-align: center;'><b>Level: {classify_rcsi(rcsi)}</b></div>", unsafe_allow_html=True)
             else:
                 st.write(f"No simulation data for {col_names[idx]}")
+
+def generate_division_baseline_synopsis(survey_df, metadata_df, school_info):
+    """
+    Generate division-level baseline synopsis from uploaded data (no simulation).
+    Returns a dictionary with division-wide metrics.
+    """
+    if survey_df is None or metadata_df is None or school_info is None:
+        return None
+
+    total_schools = len(school_info)
+    total_teachers = metadata_df['teacher_name'].nunique()
+
+    # Compute average RCSI per school from latest survey
+    school_rcsis = []
+    school_vars = {v: [] for v in VARIABLES}
+    for sid in school_info['school_id_no']:
+        latest = get_latest_survey(survey_df, sid)
+        if latest is not None:
+            rcsi = np.mean([latest[v] for v in VARIABLES])
+            school_rcsis.append(rcsi)
+            for v in VARIABLES:
+                school_vars[v].append(latest[v])
+        else:
+            # skip schools without survey data
+            continue
+
+    if not school_rcsis:
+        return None
+
+    avg_rcsi = np.mean(school_rcsis)
+    avg_vars = {v: np.mean(school_vars[v]) for v in VARIABLES}
+    # Determine strengths/gaps at division level (based on average values)
+    strengths = [v for v in VARIABLES if avg_vars[v] >= 0.6]
+    gaps = [v for v in VARIABLES if avg_vars[v] <= 0.3]
+    moderate = [v for v in VARIABLES if 0.3 < avg_vars[v] < 0.6]
+
+    # Utilisation rate
+    total_utilised = metadata_df['utilized_by_school'].sum() if 'utilized_by_school' in metadata_df.columns else 0
+    total_research = len(metadata_df)
+    div_util_rate = (total_utilised / total_research * 100) if total_research > 0 else 0
+
+    # Milestone distribution (approximate from average variables)
+    # We can define a function to estimate milestone based on thresholds
+    # For simplicity, we can compute an "average milestone" by checking thresholds
+    # This is a rough estimate; we can just show the average of the seven variables
+    # Or we can compute the milestone for each school if we had simulation, but here we don't.
+    # We'll just compute the average of the seven variables and interpret as average milestone.
+    # To be consistent with simulation synopsis, we can use the same interpret_avg_milestone function,
+    # but we need an average milestone value. We can compute the average of the current milestone
+    # based on thresholds? That would require per-school milestone calculation based on survey values.
+    # Since survey gives variable scores, we can estimate the milestone for each school by applying thresholds
+    # (similar to simulation's update logic). Let's do that:
+    def estimate_milestone(row):
+        # simulate milestone progression based on thresholds
+        milestone = 0
+        # We'll create a dictionary of variables from row
+        vals = {v: row[v] for v in VARIABLES}
+        # Simple rule: if A >=0.8 -> M1, if C>=0.7 -> M2, etc.
+        # But we need to follow the sequence.
+        # We'll manually apply the thresholds in order.
+        if vals['A'] >= 0.8:
+            milestone = 1
+            if vals['C'] >= 0.7:
+                milestone = 2
+                if vals['S'] >= 0.7:
+                    milestone = 3
+                    if vals['I'] >= 0.8:
+                        milestone = 4
+                        if vals['P'] >= 0.8:
+                            milestone = 5
+                            if vals['M'] >= 0.7:
+                                milestone = 6
+                                # if M >=0.9 and R>=0.8, could cycle, but we ignore for baseline
+        return milestone
+
+    school_milestones = []
+    for sid in school_info['school_id_no']:
+        latest = get_latest_survey(survey_df, sid)
+        if latest is not None:
+            school_milestones.append(estimate_milestone(latest))
+    avg_milestone = np.mean(school_milestones) if school_milestones else 0
+
+    # Stage distribution
+    early = sum(1 for m in school_milestones if m <= 2)
+    advanced = sum(1 for m in school_milestones if m >= 4)
+    transitional = len(school_milestones) - early - advanced
+    early_percent = (early / total_schools * 100) if total_schools > 0 else 0
+    advanced_percent = (advanced / total_schools * 100) if total_schools > 0 else 0
+    transitional_percent = (transitional / total_schools * 100) if total_schools > 0 else 0
+
+    # Generate recommendations (division-level)
+    gap_actions = {
+        'C': "Build Teacher Capacity (C) across division. Conduct division-wide training workshops.",
+        'S': "Improve Structured Support (S). Increase budget allocation and mentoring programs.",
+        'I': "Strengthen Institutional Anchoring (I). Embed research in division strategic plans.",
+        'P': "Enhance Community of Practice (P). Establish division-wide research sharing forums.",
+        'M': "Boost Impact Realization (M). Document and disseminate research outcomes.",
+    }
+    recommendations = [f"**Priority: {gap_actions[var]}**" for var in gaps if var in gap_actions]
+    if not recommendations:
+        recommendations.append("All variables are at moderate or high levels division-wide. Maintain current policies.")
+
+    synopsis = {
+        'total_schools': total_schools,
+        'total_teachers': total_teachers,
+        'avg_rcsi': avg_rcsi,
+        'avg_vars': avg_vars,
+        'strengths': strengths,
+        'gaps': gaps,
+        'moderate': moderate,
+        'div_util_rate': div_util_rate,
+        'avg_milestone': avg_milestone,
+        'stage_distribution': {'early': early, 'transitional': transitional, 'advanced': advanced,
+                               'early_pct': early_percent, 'trans_pct': transitional_percent, 'adv_pct': advanced_percent},
+        'recommendations': recommendations,
+    }
+    return synopsis
