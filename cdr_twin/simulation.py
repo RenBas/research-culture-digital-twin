@@ -13,18 +13,21 @@ from .constants import (
     MILESTONE_MIN_MONTHS, MILESTONE_THRESHOLDS, MILESTONE_NAMES
 )
 
+
 @dataclass
 class CycleRecord:
     cycle_number: int
     total_improvement: float
     completion_month: int
 
+
 class SchoolAgent:
     def __init__(self, unique_id: int,
                  initial_R=0.3, initial_A=0.2, initial_C=0.2,
                  initial_S=0.1, initial_I=0.1, initial_P=0.1, initial_M=0.0,
                  coeff_dict: Optional[Dict[str, float]] = None,
-                 random_events_enabled: bool = False):
+                 random_events_enabled: bool = False,
+                 initial_rcsi: float = 0.0):
         self.id = unique_id
         self.real_id: int = unique_id
         self.R = initial_R
@@ -39,7 +42,8 @@ class SchoolAgent:
         self.current_cycle_accumulator = 0.0
         self.cycle_improvements: List[CycleRecord] = []
         self.cycle_count = 0
-        self.running_total_outcome = 0.0
+        # Start cumulative RCSI from the baseline value
+        self.running_total_outcome = initial_rcsi
         self.random_events_enabled = random_events_enabled
         self.model_time = 0
         self._rng = np.random.RandomState()
@@ -121,19 +125,27 @@ class SchoolAgent:
                         completion_month=self.model_time))
         self.current_cycle_accumulator = 0.0
 
+
 class Simulation:
     def __init__(self, num_schools=1, random_events=False, agent_params=None):
         if agent_params:
             self.agents = []
-            for i, params in enumerate(agent_params):
-                init_R, init_A, init_C, init_S, init_I, init_P, init_M, coeff = params
-                self.agents.append(SchoolAgent(i,
-                                               initial_R=init_R, initial_A=init_A,
-                                               initial_C=init_C, initial_S=init_S,
-                                               initial_I=init_I, initial_P=init_P,
-                                               initial_M=init_M,
-                                               coeff_dict=coeff,
-                                               random_events_enabled=random_events))
+            for params in agent_params:
+                # Unpack: init variables, coefficients, and initial RCSI
+                init_R, init_A, init_C, init_S, init_I, init_P, init_M, coeff, initial_rcsi = params
+                self.agents.append(SchoolAgent(
+                    unique_id=len(self.agents),
+                    initial_R=init_R,
+                    initial_A=init_A,
+                    initial_C=init_C,
+                    initial_S=init_S,
+                    initial_I=init_I,
+                    initial_P=init_P,
+                    initial_M=init_M,
+                    coeff_dict=coeff,
+                    random_events_enabled=random_events,
+                    initial_rcsi=initial_rcsi
+                ))
         else:
             self.agents = [SchoolAgent(i, random_events_enabled=random_events) for i in range(num_schools)]
 
@@ -145,10 +157,12 @@ class Simulation:
     def get_agent(self, idx=0):
         return self.agents[idx]
 
+
 # --- Helpers for history, seeding, overriding ---
 def create_empty_history(school_ids):
     return {sid: {var: [] for var in VARIABLES + ['month', 'milestone', 'running_outcome']}
             for sid in school_ids}
+
 
 def seed_agents_from_metadata(agents, school_ids, metadata_df):
     for agent in agents:
@@ -160,6 +174,7 @@ def seed_agents_from_metadata(agents, school_ids, metadata_df):
         agent.C = min(VALUE_CEIL, agent.C + len(sm[sm['document_type'] == 'full_paper']) * 0.005)
         agent.P = min(VALUE_CEIL, agent.P + sm['theme'].nunique() * 0.01)
 
+
 def record_history(history, agents, total_months):
     for agent in agents:
         h = history[agent.real_id]
@@ -169,6 +184,7 @@ def record_history(history, agents, total_months):
         h['milestone'].append(agent.current_milestone)
         h['running_outcome'].append(agent.running_total_outcome)
 
+
 def apply_survey_override(agents, survey_df, target_month):
     for agent in agents:
         row = survey_df[(survey_df['school_id_no'] == agent.real_id) & (survey_df['month_num'] == target_month)]
@@ -176,6 +192,7 @@ def apply_survey_override(agents, survey_df, target_month):
             r = row.iloc[0]
             for var in VARIABLES:
                 setattr(agent, var, r[var])
+
 
 def init_simulation_with_data(school_ids, metadata_df, random_events, agent_params=None):
     if agent_params:
