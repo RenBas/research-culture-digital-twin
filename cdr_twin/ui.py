@@ -22,7 +22,7 @@ from .gauges import create_gauge, create_utilisation_gauge, create_rcsi_gauge, d
 from .data import process_survey, process_metadata, get_latest_survey
 from .metrics import _compute_research_metrics
 from .simulation import Simulation, create_empty_history, init_simulation_with_data, record_history, apply_survey_override
-from .analysis import generate_baseline_synopsis, baseline_heatmap, cycle_research_correlation, division_level_analysis, school_comparison_gauge
+from .analysis import generate_baseline_synopsis, baseline_heatmap, cycle_research_correlation, division_level_analysis, school_comparison_gauge, generate_division_baseline_synopsis
 from .monte_carlo import calibrate_coefficients, get_agent_params, run_sensitivity, monte_carlo_sim, plot_monte_carlo_bands, causal_analysis
 
 def apply_theme(dark_mode: bool) -> None:
@@ -275,7 +275,7 @@ def app():
                     else:
                         st.info("Switch to Division Head role to see division utilisation.")
 
-                # Baseline synopsis
+                # Baseline synopsis (school)
                 if 'baseline_synopsis' not in st.session_state:
                     with st.spinner("Generating baseline synopsis..."):
                         time.sleep(0.5)
@@ -289,7 +289,7 @@ def app():
                     bs = st.session_state.baseline_synopsis
                     bg_color = '#2E2E2E' if dark_mode else '#E3F2FD'
                     text_col = 'white' if dark_mode else 'inherit'
-                    st.markdown("### Baseline Synopsis")
+                    st.markdown("### Baseline Synopsis (School)")
                     st.markdown(f"""
                     <div style="background-color: {bg_color}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
                     <b>School: {selected_school_name}</b><br>
@@ -300,6 +300,40 @@ def app():
                     Actionable Recommendations:<br>{'<br>'.join(bs['recommendations'])}
                     </div>
                     """, unsafe_allow_html=True)
+
+                # ---- NEW: Division Baseline Synopsis (if Division Head) ----
+                if show_div_data:
+                    if 'division_baseline_synopsis' not in st.session_state:
+                        with st.spinner("Generating division baseline synopsis..."):
+                            time.sleep(0.5)
+                            div_syn = generate_division_baseline_synopsis(survey_df, metadata_df, school_info)
+                            if div_syn:
+                                st.session_state.division_baseline_synopsis = div_syn
+                            else:
+                                st.session_state.division_baseline_synopsis = None
+                            st.rerun()
+
+                    if 'division_baseline_synopsis' in st.session_state and st.session_state.division_baseline_synopsis is not None:
+                        ds = st.session_state.division_baseline_synopsis
+                        bg_color = '#2E2E2E' if dark_mode else '#E8F5E9'
+                        text_col = 'white' if dark_mode else 'inherit'
+                        st.markdown("### Baseline Synopsis (Division)")
+                        early_pct = ds['stage_distribution']['early_pct']
+                        adv_pct = ds['stage_distribution']['adv_pct']
+                        trans_pct = ds['stage_distribution']['trans_pct']
+                        st.markdown(f"""
+                        <div style="background-color: {bg_color}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
+                        <b>Division‑Level Baseline (all {ds['total_schools']} schools)</b><br>
+                        - Average RCSI: <b>{ds['avg_rcsi']:.3f}</b><br>
+                        - Average Milestone: <b>{ds['avg_milestone']:.1f}</b><br>
+                        - Research Utilisation Rate: <b>{ds['div_util_rate']:.1f}%</b><br>
+                        - Strengths (≥0.6): {', '.join(ds['strengths']) if ds['strengths'] else 'None'}<br>
+                        - Critical Gaps (≤0.3): {', '.join(ds['gaps']) if ds['gaps'] else 'None'}<br>
+                        - Moderate (0.3–0.6): {', '.join(ds['moderate']) if ds['moderate'] else 'None'}<br>
+                        - Stage distribution: {early_pct:.1f}% early (M≤2), {trans_pct:.1f}% transitional (M3), {adv_pct:.1f}% advanced (M≥4).<br>
+                        Actionable Recommendations:<br>{'<br>'.join(ds['recommendations'])}
+                        </div>
+                        """, unsafe_allow_html=True)
 
             else:
                 st.info("No survey data for current quarter.")
@@ -517,7 +551,7 @@ def app():
                                 else:
                                     st.info("Not enough Monte Carlo runs for causal analysis (need >10).")
 
-                    # School synopsis
+                    # School synopsis (simulation)
                     rcsi_val = agent.running_total_outcome
                     rcsi_level = classify_rcsi(rcsi_val)
                     milestone_name = MILESTONE_NAMES.get(agent.current_milestone, f"Milestone {agent.current_milestone}")
@@ -588,7 +622,7 @@ def app():
                                 })
                             st.table(pd.DataFrame(table_data))
 
-                    # Division synopsis
+                    # Division synopsis (simulation) – only if show_div_data
                     if show_div_data:
                         total_schools = len(st.session_state.sim.agents)
                         early_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
