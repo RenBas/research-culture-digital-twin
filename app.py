@@ -1,6 +1,6 @@
 # ============================================================
 # Digital Twin – CDO Research Culture Framework (Phase 1+2 Merged)
-# with Gauges, Role Selector, Comparative Gauges, and Full Axis Labels
+# with Gauges, Needles, Role Selector, Comparative Gauges, Glossary, and Full Axis Labels
 # ============================================================
 import streamlit as st
 import pandas as pd
@@ -238,7 +238,7 @@ def get_figure_download_link(fig, filename="chart.html", link_text="Download cha
 
 
 # ============================================================
-# GAUGE BUILDERS
+# GAUGE BUILDERS (with needle and centered interpretation)
 # ============================================================
 
 def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 1.0,
@@ -246,7 +246,7 @@ def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 
                  steps: List[Tuple[float, float, str]] = None,
                  dark_mode: bool = False) -> go.Figure:
     """
-    Create a circular gauge with needle, optional threshold marker, and color segments.
+    Create a circular gauge with a visible bar (needle) and an optional threshold line.
     """
     if steps is None:
         steps = [
@@ -257,22 +257,25 @@ def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 
             (0.8, 1.0, "#2E7D32"),   # Dark Green
         ]
 
+    # We want a bar (arc) to act as a needle, so set bar color to a solid color.
+    bar_color = USTP_DARK_BLUE if not dark_mode else USTP_GOLD
+
     fig = go.Figure(go.Indicator(
-        mode = "gauge+number+delta",
+        mode = "gauge+number",
         value = value,
         domain = {'x': [0, 1], 'y': [0, 1]},
         title = {'text': title, 'font': {'size': 14, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE}},
         gauge = {
             'axis': {'range': [min_val, max_val], 'tickwidth': 1, 'tickcolor': "darkblue",
                      'tickvals': [0, 0.2, 0.4, 0.6, 0.8, 1.0],
-                     'ticktext': ['0', '', '', '', '', '1'],  # minimal tick labels
-                     'showticklabels': False},  # hide numeric ticks
-            'bar': {'color': "rgba(0,0,0,0)"},  # no bar, we'll use needle
+                     'ticktext': ['0', '', '', '', '', '1'],
+                     'showticklabels': False},
+            'bar': {'color': bar_color, 'thickness': 0.3},  # this is the needle (filled arc)
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 0,
             'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
             'threshold': {
-                'line': {'color': threshold_color, 'width': 4},
+                'line': {'color': threshold_color, 'width': 2},
                 'thickness': 0.75,
                 'value': threshold
             } if threshold is not None else None
@@ -280,6 +283,7 @@ def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 
         number = {'font': {'size': 20, 'color': USTP_GOLD if dark_mode else USTP_DARK_BLUE},
                   'suffix': '  '}
     ))
+    # Add a thin threshold line at the current value to emphasize the needle
     fig.update_layout(
         height=220,
         margin=dict(l=20, r=20, t=40, b=20),
@@ -296,6 +300,7 @@ def create_utilisation_gauge(value: float, title: str, dark_mode: bool = False) 
         (60, 80, "#66BB6A"),
         (80, 100, "#2E7D32"),
     ]
+    bar_color = USTP_DARK_BLUE if not dark_mode else USTP_GOLD
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = value,
@@ -306,7 +311,7 @@ def create_utilisation_gauge(value: float, title: str, dark_mode: bool = False) 
                      'tickvals': [0, 20, 40, 60, 80, 100],
                      'ticktext': ['0', '', '', '', '', '100'],
                      'showticklabels': False},
-            'bar': {'color': "rgba(0,0,0,0)"},
+            'bar': {'color': bar_color, 'thickness': 0.3},
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 0,
             'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
@@ -330,6 +335,7 @@ def create_rcsi_gauge(value: float, title: str, dark_mode: bool = False) -> go.F
         (0.6, 0.8, "#66BB6A"),
         (0.8, 1.0, "#2E7D32"),
     ]
+    bar_color = USTP_DARK_BLUE if not dark_mode else USTP_GOLD
     fig = go.Figure(go.Indicator(
         mode = "gauge+number",
         value = value,
@@ -340,7 +346,7 @@ def create_rcsi_gauge(value: float, title: str, dark_mode: bool = False) -> go.F
                      'tickvals': [0, 0.2, 0.4, 0.6, 0.8, 1.0],
                      'ticktext': ['0', '', '', '', '', '1'],
                      'showticklabels': False},
-            'bar': {'color': "rgba(0,0,0,0)"},
+            'bar': {'color': bar_color, 'thickness': 0.3},
             'bgcolor': "rgba(0,0,0,0)",
             'borderwidth': 0,
             'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
@@ -355,6 +361,26 @@ def create_rcsi_gauge(value: float, title: str, dark_mode: bool = False) -> go.F
         font=dict(color=USTP_GOLD if dark_mode else USTP_DARK_BLUE)
     )
     return fig
+
+def display_gauge_with_interpretation(fig, value, interpretation_list, dark_mode):
+    """
+    Display a Plotly gauge and then a centered interpretation text below it.
+    """
+    st.plotly_chart(fig, use_container_width=True)
+    # Determine interpretation level
+    if value < 0.2:
+        idx = 0
+    elif value < 0.4:
+        idx = 1
+    elif value < 0.6:
+        idx = 2
+    elif value < 0.8:
+        idx = 3
+    else:
+        idx = 4
+    level_text = interpretation_list[idx] if interpretation_list else ""
+    # Center the text using HTML
+    st.markdown(f"<div style='text-align: center;'><b>{level_text}</b></div>", unsafe_allow_html=True)
 
 
 # ============================================================
@@ -974,7 +1000,7 @@ def baseline_heatmap(survey_df, metadata_df, dark_mode):
         return
     corr = merged[VARIABLES + ['output_count']].corr()
     fig = px.imshow(corr, text_auto=True, title="Correlation Matrix", color_continuous_scale='Blues',
-                    height=650, width=850)
+                    height=700, width=950)
     fig.update_layout(template='plotly_dark' if dark_mode else 'plotly_white',
                       xaxis_title="Variables", yaxis_title="Variables")
     st.plotly_chart(fig, use_container_width=True)
@@ -1051,8 +1077,7 @@ def school_comparison_gauge(school_ids, school_info, history_per_school, dark_mo
         st.warning("Limit to 3 schools. Only first 3 will be shown.")
         school_ids = school_ids[:3]
 
-    # Determine which metric to show: RCSI or specific milestone variable?
-    # We'll show RCSI as the primary gauge, and milestone as text.
+    # Determine which metric to show: RCSI as primary gauge, milestone as text.
     col_names = []
     for sid in school_ids:
         name = school_info[school_info['school_id_no'] == sid]['school_name'].values[0]
@@ -1075,6 +1100,28 @@ def school_comparison_gauge(school_ids, school_info, history_per_school, dark_mo
 
 
 # ============================================================
+# GLOSSARY
+# ============================================================
+
+def create_glossary():
+    glossary = {
+        "R (Readiness)": "Measures the school's preparedness and foundational conditions for research, including infrastructure and mindset.",
+        "A (Awareness)": "Indicates the level of research awareness among teachers and leaders. The threshold for M0→M1 is **A ≥ 0.8**.",
+        "C (Capacity)": "Captures the research skills, training, and expertise of the teaching staff.",
+        "S (Structured Support)": "Reflects the availability of budget, time, mentoring, and other institutional support for research.",
+        "I (Institutional Anchoring)": "Measures how deeply research is embedded in school plans, policies, and regular meetings.",
+        "P (Community of Practice)": "Evaluates the strength of research collaboration, sharing forums, and peer learning.",
+        "M (Impact Realization)": "Tracks the tangible outcomes of research, such as publications, utilizations, and policy changes.",
+        "RCSI (Research Culture Sustainability Index)": "A cumulative score that aggregates the seven variables, indicating overall sustainability. Higher is better.",
+        "Milestone (M0–M6)": "A sequential progression from Readiness (M0) to Impact Realization (M6). Reaching M6 and cycling back indicates a sustainable research culture.",
+        "Utilisation Rate": "Percentage of research outputs that have been used or applied by the school or division.",
+        "Sensitivity Analysis": "Shows which policy lever (Training, Mentorship, Budget, Leadership, Collaboration) has the most influence on RCSI.",
+        "Monte Carlo Simulation": "Generates multiple scenarios with random variations to estimate the range of possible RCSI outcomes.",
+    }
+    return glossary
+
+
+# ============================================================
 # STREAMLIT APP
 # ============================================================
 
@@ -1091,7 +1138,7 @@ with st.sidebar:
     dark_mode = st.checkbox("Dark Mode", value=False)
     apply_theme(dark_mode)
 
-    # Role selector (restored)
+    # Role selector
     user_role = st.radio("User Role", options=["Principal", "Division Head"], index=0,
                          help="Principal sees only the selected school. Division Head sees division-level aggregates.")
 
@@ -1099,6 +1146,13 @@ with st.sidebar:
     st.metric("Total Teachers Recorded", st.session_state.total_teachers)
     if st.session_state.get('total_months', 0) > 0:
         st.metric("Simulation Month", st.session_state.total_months)
+
+    # Glossary dropdown
+    st.markdown("---")
+    with st.expander("📚 Glossary of Terms"):
+        glossary = create_glossary()
+        for term, definition in glossary.items():
+            st.markdown(f"**{term}:** {definition}")
 
     st.markdown("---")
     st.markdown(f"<h3 style='color: {USTP_DARK_BLUE};'>Policy Levers</h3>", unsafe_allow_html=True)
@@ -1202,7 +1256,6 @@ if survey_file is not None and metadata_file is not None:
         # ROLE-BASED FILTERING
         # ------------------------------------------------------------------
         if user_role == "Principal":
-            # Only show the selected school
             display_school_ids = [selected_school_id]
             show_div_data = False
         else:  # Division Head
@@ -1231,13 +1284,9 @@ if survey_file is not None and metadata_file is not None:
                 if i < 4:
                     with cols[i]:
                         val = latest[var]
-                        # Add threshold for Awareness (A) only
                         thresh = 0.8 if var == 'A' else None
                         fig = create_gauge(val, VAR_FULL_NAMES[var], threshold=thresh, dark_mode=dark_mode)
-                        st.plotly_chart(fig, use_container_width=True)
-                        # Interpretation text
-                        level = classify_rcsi(val)
-                        st.caption(f"**{level}**")
+                        display_gauge_with_interpretation(fig, val, VAR_INTERPRETATION[var], dark_mode)
                 else:
                     if i == 4:
                         cols2 = st.columns(3)
@@ -1246,9 +1295,7 @@ if survey_file is not None and metadata_file is not None:
                         val = latest[var]
                         thresh = 0.8 if var == 'A' else None
                         fig = create_gauge(val, VAR_FULL_NAMES[var], threshold=thresh, dark_mode=dark_mode)
-                        st.plotly_chart(fig, use_container_width=True)
-                        level = classify_rcsi(val)
-                        st.caption(f"**{level}**")
+                        display_gauge_with_interpretation(fig, val, VAR_INTERPRETATION[var], dark_mode)
 
             # ---- RCSI Gauges: School vs Division (side-by-side) ----
             st.markdown("### School & Division RCSI Comparison")
@@ -1257,14 +1304,14 @@ if survey_file is not None and metadata_file is not None:
 
             col_r1, col_r2 = st.columns(2)
             with col_r1:
-                fig1 = create_rcsi_gauge(rcsi_school, f"{selected_school_name}\nRCSI", dark_mode)
+                fig1 = create_rcsi_gauge(rcsi_school, f"{selected_school_name}\nRCSI (Average)", dark_mode)
                 st.plotly_chart(fig1, use_container_width=True)
-                st.caption(f"**Level:** {classify_rcsi(rcsi_school)}")
+                st.markdown(f"<div style='text-align: center;'><b>Level: {classify_rcsi(rcsi_school)}</b></div>", unsafe_allow_html=True)
             with col_r2:
                 if show_div_data:
                     fig2 = create_rcsi_gauge(rcsi_division, "Division Average RCSI", dark_mode)
                     st.plotly_chart(fig2, use_container_width=True)
-                    st.caption(f"**Level:** {classify_rcsi(rcsi_division)}")
+                    st.markdown(f"<div style='text-align: center;'><b>Level: {classify_rcsi(rcsi_division)}</b></div>", unsafe_allow_html=True)
                 else:
                     st.info("Switch to Division Head role to see division average.")
 
@@ -1278,12 +1325,12 @@ if survey_file is not None and metadata_file is not None:
             with col_u1:
                 fig_u1 = create_utilisation_gauge(school_util, f"{selected_school_name}\nUtilisation", dark_mode)
                 st.plotly_chart(fig_u1, use_container_width=True)
-                st.caption(f"**{classify_utilisation(school_util)}**")
+                st.markdown(f"<div style='text-align: center;'><b>{classify_utilisation(school_util)}</b></div>", unsafe_allow_html=True)
             with col_u2:
                 if show_div_data:
                     fig_u2 = create_utilisation_gauge(div_util, "Division Utilisation", dark_mode)
                     st.plotly_chart(fig_u2, use_container_width=True)
-                    st.caption(f"**{classify_utilisation(div_util)}**")
+                    st.markdown(f"<div style='text-align: center;'><b>{classify_utilisation(div_util)}</b></div>", unsafe_allow_html=True)
                 else:
                     st.info("Switch to Division Head role to see division utilisation.")
 
@@ -1433,9 +1480,7 @@ if survey_file is not None and metadata_file is not None:
                             val = final_vals[i]
                             thresh = 0.8 if var == 'A' else None
                             fig = create_gauge(val, VAR_FULL_NAMES[var], threshold=thresh, dark_mode=dark_mode)
-                            st.plotly_chart(fig, use_container_width=True)
-                            level = classify_rcsi(val)
-                            st.caption(f"**{level}**")
+                            display_gauge_with_interpretation(fig, val, VAR_INTERPRETATION[var], dark_mode)
                     else:
                         if i == 4:
                             cols_g2 = st.columns(3)
@@ -1444,24 +1489,22 @@ if survey_file is not None and metadata_file is not None:
                             val = final_vals[i]
                             thresh = 0.8 if var == 'A' else None
                             fig = create_gauge(val, VAR_FULL_NAMES[var], threshold=thresh, dark_mode=dark_mode)
-                            st.plotly_chart(fig, use_container_width=True)
-                            level = classify_rcsi(val)
-                            st.caption(f"**{level}**")
+                            display_gauge_with_interpretation(fig, val, VAR_INTERPRETATION[var], dark_mode)
 
-                # ---- Final RCSI gauge ----
+                # ---- Final RCSI gauge (School and Division) ----
                 final_rcsi = agent.running_total_outcome
                 st.markdown("### Final RCSI")
                 col_f1, col_f2 = st.columns(2)
                 with col_f1:
-                    fig_rcsi_final = create_rcsi_gauge(final_rcsi, f"{selected_school_name}\nFinal RCSI", dark_mode)
+                    fig_rcsi_final = create_rcsi_gauge(final_rcsi, f"{selected_school_name}\nFinal RCSI (Average)", dark_mode)
                     st.plotly_chart(fig_rcsi_final, use_container_width=True)
-                    st.caption(f"**Level:** {classify_rcsi(final_rcsi)}")
+                    st.markdown(f"<div style='text-align: center;'><b>Level: {classify_rcsi(final_rcsi)}</b></div>", unsafe_allow_html=True)
                 with col_f2:
                     if show_div_data:
                         div_rcsi_final = np.mean([a.running_total_outcome for a in st.session_state.sim.agents])
                         fig_div_rcsi = create_rcsi_gauge(div_rcsi_final, "Division Avg Final RCSI", dark_mode)
                         st.plotly_chart(fig_div_rcsi, use_container_width=True)
-                        st.caption(f"**Level:** {classify_rcsi(div_rcsi_final)}")
+                        st.markdown(f"<div style='text-align: center;'><b>Level: {classify_rcsi(div_rcsi_final)}</b></div>", unsafe_allow_html=True)
                     else:
                         st.info("Switch to Division Head role for division average.")
 
@@ -1475,7 +1518,6 @@ if survey_file is not None and metadata_file is not None:
 
                 # ---- Comparative School Analysis (gauges with dropdown) ----
                 with st.expander("Comparative School Analysis (Gauges)"):
-                    # Limit to 3 schools
                     comp_options = [sid for sid in school_ids if sid != selected_school_id]
                     comp_options = [selected_school_id] + comp_options
                     selected_comparison = st.multiselect(
@@ -1607,7 +1649,7 @@ if survey_file is not None and metadata_file is not None:
                             })
                         st.table(pd.DataFrame(table_data))
 
-                # ---- Division Synopsis ----
+                # ---- Division Synopsis (restored) ----
                 if show_div_data:
                     total_schools = len(st.session_state.sim.agents)
                     early_stage = sum(1 for a in st.session_state.sim.agents if a.current_milestone <= 2)
