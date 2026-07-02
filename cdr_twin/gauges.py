@@ -8,9 +8,13 @@ from typing import List, Optional, Tuple
 from .constants import USTP_GOLD, USTP_DARK_BLUE, DEPED_RED
 
 def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 1.0,
-                 threshold: Optional[float] = None, threshold_color: str = DEPED_RED,
+                 threshold: Optional[float] = None, threshold_color: str = "black",
                  steps: List[Tuple[float, float, str]] = None,
                  dark_mode: bool = False) -> go.Figure:
+    """
+    Create a circular gauge with a thick bar (needle) and a threshold line.
+    Threshold line colour is black by default.
+    """
     if steps is None:
         steps = [
             (0.0, 0.2, "#D32F2F"),
@@ -20,10 +24,10 @@ def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 
             (0.8, 1.0, "#2E7D32"),
         ]
     bar_color = USTP_GOLD if dark_mode else USTP_DARK_BLUE
-    # If no threshold given, use the value itself as a red line
+    # If no threshold given, use the value itself as the threshold (black line)
     if threshold is None:
         threshold = value
-        threshold_color = DEPED_RED
+        threshold_color = "black"
 
     fig = go.Figure(go.Indicator(
         mode="gauge+number",
@@ -56,7 +60,11 @@ def create_gauge(value: float, title: str, min_val: float = 0, max_val: float = 
     )
     return fig
 
+
 def create_utilisation_gauge(value: float, title: str, dark_mode: bool = False) -> go.Figure:
+    """
+    Create a utilisation gauge (0-100) with a black threshold line at the current value.
+    """
     steps = [
         (0, 20, "#D32F2F"),
         (20, 40, "#F5A623"),
@@ -80,7 +88,7 @@ def create_utilisation_gauge(value: float, title: str, dark_mode: bool = False) 
             'borderwidth': 0,
             'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
             'threshold': {
-                'line': {'color': DEPED_RED, 'width': 2},
+                'line': {'color': "black", 'width': 2},
                 'thickness': 0.75,
                 'value': value
             }
@@ -96,7 +104,11 @@ def create_utilisation_gauge(value: float, title: str, dark_mode: bool = False) 
     )
     return fig
 
+
 def create_rcsi_gauge(value: float, title: str, dark_mode: bool = False) -> go.Figure:
+    """
+    Create an RCSI gauge (0-1) with a black threshold line at the current value.
+    """
     steps = [
         (0.0, 0.2, "#D32F2F"),
         (0.2, 0.4, "#F5A623"),
@@ -120,7 +132,7 @@ def create_rcsi_gauge(value: float, title: str, dark_mode: bool = False) -> go.F
             'borderwidth': 0,
             'steps': [{'range': [s[0], s[1]], 'color': s[2]} for s in steps],
             'threshold': {
-                'line': {'color': DEPED_RED, 'width': 2},
+                'line': {'color': "black", 'width': 2},
                 'thickness': 0.75,
                 'value': value
             }
@@ -136,7 +148,11 @@ def create_rcsi_gauge(value: float, title: str, dark_mode: bool = False) -> go.F
     )
     return fig
 
+
 def display_gauge_with_interpretation(fig, value, interpretation_list, dark_mode):
+    """
+    Display a Plotly gauge and then a centered interpretation text below it.
+    """
     st.plotly_chart(fig, use_container_width=True)
     if value < 0.2:
         idx = 0
