@@ -143,11 +143,14 @@ def get_agent_params(school_ids, survey_df, metadata_df, calibrated_coeff=None):
         latest = get_latest_survey(survey_df, sid)
         if latest is not None:
             init_vals = (latest['R'], latest['A'], latest['C'], latest['S'], latest['I'], latest['P'], latest['M'])
+            baseline_rcsi = np.mean(init_vals)
         else:
             init_vals = (0.3, 0.2, 0.2, 0.1, 0.1, 0.1, 0.0)
+            baseline_rcsi = np.mean(init_vals)
         mult = multipliers.get(cluster_map.get(sid, 0), 1.0)
         coeff = {k: v * mult for k, v in base_coeff.items()}
-        params.append((*init_vals, coeff))
+        # Append baseline_rcsi as the last element of the tuple
+        params.append((*init_vals, coeff, baseline_rcsi))
     return params
 
 
@@ -197,10 +200,15 @@ def monte_carlo_sim(num_runs, sim_class, agent_params, school_ids, levers, durat
     for _ in range(num_runs):
         noisy_params = []
         for params in agent_params:
-            *init_vals, coeff = params
+            # unpack: variables, coeff, baseline_rcsi
+            *init_vals, coeff, baseline_rcsi = params
+            # Perturb initial variables
             new_init = [max(VALUE_FLOOR, min(VALUE_CEIL, v + np.random.normal(0, 0.02))) for v in init_vals]
+            # Perturb coefficients
             noisy_coeff = {k: v * np.random.normal(1, 0.05) for k, v in coeff.items()}
-            noisy_params.append((*new_init, noisy_coeff))
+            # Recompute baseline RCSI from new initial variables
+            new_baseline_rcsi = np.mean(new_init)
+            noisy_params.append((*new_init, noisy_coeff, new_baseline_rcsi))
         sim = sim_class(agent_params=noisy_params, random_events=True)
         for i, agent in enumerate(sim.agents):
             agent.real_id = school_ids[i]
