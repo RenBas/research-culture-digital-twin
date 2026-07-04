@@ -1,5 +1,5 @@
 # ============================================================
-# ui.py – main Streamlit user interface
+# ui.py – main Streamlit user interface (with school map)
 # ============================================================
 
 import streamlit as st
@@ -10,6 +10,10 @@ from plotly.subplots import make_subplots
 import base64
 import time
 from typing import List, Optional
+
+# --- NEW: folium for interactive map ---
+import folium
+from streamlit_folium import st_folium
 
 # Import all modules
 from .constants import (
@@ -154,6 +158,8 @@ def app():
             survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
         with col2:
             metadata_file = st.file_uploader("Upload research metadata (CSV)", type=["csv"], key="metadata")
+        # --- NEW: coordinates file uploader ---
+        coord_file = st.file_uploader("School Coordinates CSV (optional)", type=["csv"], key="coordinates")
         st.markdown("---")
         st.markdown("**Need templates?**")
         survey_template = ("month,school_id_no,school_name,R,A,C,S,I,P,M\n"
@@ -175,6 +181,17 @@ def app():
         metadata_df_raw = pd.read_csv(metadata_file)
         survey_df, school_info, survey_error = process_survey(survey_df_raw)
         metadata_df, meta_error = process_metadata(metadata_df_raw)
+
+        # --- NEW: Process coordinates file ---
+        if coord_file is not None:
+            coord_df_raw = pd.read_csv(coord_file)
+            if not {'school_id_no', 'latitude', 'longitude'}.issubset(coord_df_raw.columns):
+                st.error("Coordinates file must contain columns: school_id_no, latitude, longitude")
+                coord_df = None
+            else:
+                coord_df = coord_df_raw[['school_id_no', 'latitude', 'longitude']].dropna()
+        else:
+            coord_df = None
 
         if survey_error:
             st.error(f"Survey error: {survey_error}")
@@ -505,6 +522,50 @@ def app():
                                                     dark_mode)
                         else:
                             st.info("Select at least 2 schools for comparison.")
+
+                    # --- NEW: Division School Map (only for Division Head) ---
+                    if show_div_data and coord_df is not None:
+                        with st.expander("📍 Division School Map"):
+                            # Center map on mean of coordinates
+                            map_center = [coord_df['latitude'].mean(), coord_df['longitude'].mean()]
+                            school_map = folium.Map(location=map_center, zoom_start=12)
+
+                            # Build simulation state lookup
+                            sim_state = {}
+                            for agent in st.session_state.sim.agents:
+                                sim_state[agent.real_id] = {
+                                    'RCSI': agent.running_total_outcome,
+                                    'milestone': agent.current_milestone,
+                                    'school_name': school_info[school_info['school_id_no'] == agent.real_id]['school_name'].values[0]
+                                    if not school_info[school_info['school_id_no'] == agent.real_id].empty else f"School {agent.real_id}"
+                                }
+
+                            # Color by milestone
+                            milestone_colors = {0: 'red', 1: 'orange', 2: 'yellow', 3: 'green',
+                                               4: 'lightblue', 5: 'blue', 6: 'purple'}
+
+                            for _, row in coord_df.iterrows():
+                                sid = int(row['school_id_no'])
+                                if sid in sim_state:
+                                    state = sim_state[sid]
+                                    lat, lon = row['latitude'], row['longitude']
+                                    color = milestone_colors.get(state['milestone'], 'gray')
+                                    popup_text = f"""
+                                    <b>{state['school_name']}</b><br>
+                                    RCSI: {state['RCSI']:.3f}<br>
+                                    Milestone: M{state['milestone']}<br>
+                                    """
+                                    folium.Marker(
+                                        location=[lat, lon],
+                                        popup=folium.Popup(popup_text, max_width=250),
+                                        icon=folium.Icon(color=color, icon='info-sign')
+                                    ).add_to(school_map)
+
+                            st_folium(school_map, width=700, height=500)
+                            st.caption("Marker colors: Red=M0, Orange=M1, Yellow=M2, Green=M3, "
+                                       "Light blue=M4, Blue=M5, Purple=M6")
+                    elif show_div_data and coord_df is None:
+                        st.info("Upload the school coordinates CSV (in Step 1) to view the map.")
 
                     # Sensitivity
                     sensitivity_info = ""
