@@ -319,6 +319,7 @@ def app():
                     """, unsafe_allow_html=True)
 
                 # ---- NEW: Division Baseline Synopsis (if Division Head) ----
+                st.write(f"DEBUG: show_div_data={show_div_data}, coord_df is None={coord_df is None}, coord_file={coord_file}")
                 if show_div_data:
                     if 'division_baseline_synopsis' not in st.session_state:
                         with st.spinner("Generating division baseline synopsis..."):
