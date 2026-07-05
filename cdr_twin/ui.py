@@ -6,6 +6,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
+import plotly.express as px
 from plotly.subplots import make_subplots
 import base64
 import time
@@ -185,7 +186,6 @@ def app():
 
         # --- AUTO-LOAD COORDINATES (with feedback) ---
         coord_df = None
-        # Try common paths
         search_paths = [
             os.path.join(os.path.dirname(os.path.dirname(__file__)), 'school_coordinates.csv'),  # parent of cdr_twin (project root)
             os.path.join(os.path.dirname(__file__), 'school_coordinates.csv'),                  # same as ui.py (cdr_twin/)
@@ -195,8 +195,8 @@ def app():
             if os.path.isfile(path):
                 coord_df_raw = pd.read_csv(path)
                 coord_df_raw.columns = [c.strip().lower() for c in coord_df_raw.columns]
-                if {'school_id_no', 'latitude', 'longitude'}.issubset(coord_df_raw.columns):
-                    coord_df = coord_df_raw[['school_id_no', 'latitude', 'longitude']].dropna()
+                if {'school_name', 'latitude', 'longitude'}.issubset(coord_df_raw.columns):
+                    coord_df = coord_df_raw[['school_name', 'latitude', 'longitude']].dropna()
                     st.success(f"✅ Loaded coordinates automatically from {path}")
                     break
                 else:
@@ -206,10 +206,10 @@ def app():
         if coord_df is None and coord_file is not None:
             coord_df_raw = pd.read_csv(coord_file)
             coord_df_raw.columns = [c.strip().lower() for c in coord_df_raw.columns]
-            if {'school_id_no', 'latitude', 'longitude'}.issubset(coord_df_raw.columns):
-                coord_df = coord_df_raw[['school_id_no', 'latitude', 'longitude']].dropna()
+            if {'school_name', 'latitude', 'longitude'}.issubset(coord_df_raw.columns):
+                coord_df = coord_df_raw[['school_name', 'latitude', 'longitude']].dropna()
             else:
-                st.error(f"Coordinates file must contain columns: school_id_no, latitude, longitude. Found: {', '.join(coord_df_raw.columns.tolist())}")
+                st.error(f"Coordinates file must contain columns: school_name, latitude, longitude. Found: {', '.join(coord_df_raw.columns.tolist())}")
 
         if survey_error:
             st.error(f"Survey error: {survey_error}")
@@ -250,6 +250,9 @@ def app():
                 st.dataframe(df_show[['teacher_name', 'year_undertaken', 'title', 'theme', 'status', 'utilized_by_school']].head(10))
             else:
                 st.info("No research outputs for this school.")
+
+            # Compute research metrics once for reuse
+            metrics = _compute_research_metrics(metadata_df, selected_school_id)
 
             latest = get_latest_survey(survey_df, selected_school_id)
             if latest is not None:
@@ -324,6 +327,31 @@ def app():
                     bs = st.session_state.baseline_synopsis
                     bg_color = '#2E2E2E' if dark_mode else '#E3F2FD'
                     text_col = 'white' if dark_mode else 'inherit'
+
+                    # ---- New: Demographics insight for synopsis ----
+                    demo_insight = ""
+                    if metrics:
+                        # Rank
+                        if metrics.get('rank_summary') is not None:
+                            rank = metrics['rank_summary']
+                            top_rank = rank.loc[rank['total_outputs'].idxmax()]
+                            demo_insight += f" The most productive teacher rank is **{top_rank['teacher_rank']}** with {top_rank['total_outputs']} outputs (avg {top_rank['avg_outputs']:.1f} per teacher)."
+                        # Education
+                        if metrics.get('edu_summary') is not None:
+                            edu = metrics['edu_summary']
+                            top_edu = edu.loc[edu['total_outputs'].idxmax()]
+                            demo_insight += f" Teachers with **{top_edu['educational_attainment']}** produce the most research ({top_edu['total_outputs']} outputs, avg {top_edu['avg_outputs']:.1f})."
+                        # Service
+                        sd = metrics.get('service_data')
+                        if sd is not None:
+                            demo_insight += f" Average years of service is {sd['avg_service']:.1f}, with {sd['avg_output']:.1f} outputs per teacher. "
+                            if sd['slope'] > 0:
+                                demo_insight += "Research output tends to increase with years of experience."
+                            else:
+                                demo_insight += "Research output does not increase with years of service, suggesting targeted support for mid‑career teachers."
+                    if demo_insight:
+                        demo_insight = f"<b>Teacher Demographics:</b> {demo_insight}"
+
                     st.markdown("### Baseline Synopsis (School)")
                     st.markdown(f"""
                     <div style="background-color: {bg_color}; border-left: 5px solid {USTP_GOLD}; padding: 10px; border-radius: 5px; margin-top: 10px; color: {text_col};">
@@ -332,9 +360,67 @@ def app():
                     Strengths (≥0.6): {', '.join(bs['strengths']) if bs['strengths'] else 'None'}<br>
                     Critical Gaps (≤0.3): {', '.join(bs['gaps']) if bs['gaps'] else 'None'}<br>
                     Moderate (0.3–0.6): {', '.join(bs['moderate']) if bs['moderate'] else 'None'}<br>
-                    Actionable Recommendations:<br>{'<br>'.join(bs['recommendations'])}
+                    Actionable Recommendations:<br>{'<br>'.join(bs['recommendations'])}<br><br>
+                    {demo_insight}
                     </div>
                     """, unsafe_allow_html=True)
+
+                # ---- NEW: Teacher Demographics vs Outputs (baseline) ----
+                st.markdown("### 👥 Teacher Demographics vs. Research Outputs")
+                st.caption("These charts show how teacher characteristics relate to the number of research outputs produced (based on uploaded metadata only).")
+                school_meta_demo = metadata_df[metadata_df['school_id_no'] == selected_school_id]
+                if not school_meta_demo.empty:
+                    col_d1, col_d2, col_d3 = st.columns(3)
+                    with col_d1:
+                        if 'teacher_rank' in school_meta_demo.columns and not school_meta_demo['teacher_rank'].isna().all():
+                            rank_counts = school_meta_demo.groupby('teacher_rank').size().reset_index(name='Total Outputs')
+                            fig_r = px.bar(rank_counts, x='teacher_rank', y='Total Outputs',
+                                           title="By Teacher Rank",
+                                           color='teacher_rank', color_discrete_sequence=[USTP_DARK_BLUE, USTP_GOLD, DEPED_RED])
+                            fig_r.update_layout(template='plotly_dark' if dark_mode else 'plotly_white', showlegend=False)
+                            st.plotly_chart(fig_r, use_container_width=True)
+                        else:
+                            st.info("No teacher rank data available.")
+                    with col_d2:
+                        if 'educational_attainment' in school_meta_demo.columns and not school_meta_demo['educational_attainment'].isna().all():
+                            edu_counts = school_meta_demo.groupby('educational_attainment').size().reset_index(name='Total Outputs')
+                            fig_e = px.bar(edu_counts, x='educational_attainment', y='Total Outputs',
+                                           title="By Educational Attainment",
+                                           color='educational_attainment',
+                                           color_discrete_sequence=[DEPED_RED, USTP_GOLD, USTP_DARK_BLUE])
+                            fig_e.update_layout(template='plotly_dark' if dark_mode else 'plotly_white', showlegend=False)
+                            st.plotly_chart(fig_e, use_container_width=True)
+                        else:
+                            st.info("No educational attainment data available.")
+                    with col_d3:
+                        if 'years_of_service' in school_meta_demo.columns and not school_meta_demo['years_of_service'].isna().all():
+                            def service_bracket(y):
+                                if y <= 5: return "0-5"
+                                elif y <= 10: return "6-10"
+                                elif y <= 15: return "11-15"
+                                elif y <= 20: return "16-20"
+                                else: return "20+"
+                            school_meta_demo['service_bracket'] = school_meta_demo['years_of_service'].apply(service_bracket)
+                            sv_counts = school_meta_demo.groupby('service_bracket').size().reset_index(name='Total Outputs')
+                            order = ["0-5", "6-10", "11-15", "16-20", "20+"]
+                            sv_counts['service_bracket'] = pd.Categorical(sv_counts['service_bracket'], categories=order, ordered=True)
+                            sv_counts = sv_counts.sort_values('service_bracket')
+                            fig_s = px.bar(sv_counts, x='service_bracket', y='Total Outputs',
+                                           title="By Years of Service",
+                                           color='service_bracket',
+                                           color_discrete_sequence=[USTP_GOLD, DEPED_RED, USTP_DARK_BLUE, '#8E44AD', '#2ECC71'])
+                            fig_s.update_layout(template='plotly_dark' if dark_mode else 'plotly_white', showlegend=False)
+                            st.plotly_chart(fig_s, use_container_width=True)
+                        else:
+                            st.info("No years of service data available.")
+                    st.markdown("""
+                    **Interpretation:**
+                    - **Teacher Rank**: Highlights which rank (e.g., Teacher I, II, III) contributes the most research outputs. Higher ranks often correlate with greater research activity.
+                    - **Educational Attainment**: Shows how teachers with Master's or Doctoral degrees compare to those with only Bachelor's degrees in terms of research productivity.
+                    - **Years of Service**: Illustrates whether experienced teachers (20+ years) or early‑career teachers produce more research, helping to target mentoring efforts.
+                    """)
+                else:
+                    st.info("No metadata available for teacher demographics.")
 
                 # Division Baseline Synopsis (if Division Head)
                 if show_div_data:
@@ -546,29 +632,35 @@ def app():
                     # ---------------------------
                     if show_div_data and coord_df is not None:
                         with st.expander("📍 Division School Map"):
-                            # Center map on mean of coordinates
-                            map_center = [coord_df['latitude'].mean(), coord_df['longitude'].mean()]
+                            # Build name -> coordinate lookup
+                            name_to_coord = {}
+                            for _, row in coord_df.iterrows():
+                                name_to_coord[str(row['school_name']).strip()] = (row['latitude'], row['longitude'])
+
+                            lats = [v[0] for v in name_to_coord.values()]
+                            lons = [v[1] for v in name_to_coord.values()]
+                            map_center = [np.mean(lats), np.mean(lons)] if lats else [8.48, 124.65]
                             school_map = folium.Map(location=map_center, zoom_start=12)
 
-                            # Build simulation state lookup
                             sim_state = {}
+                            sim_names = []
                             for ag in st.session_state.sim.agents:
-                                sim_state[ag.real_id] = {
-                                    'RCSI': ag.running_total_outcome,
-                                    'milestone': ag.current_milestone,
-                                    'school_name': school_info[school_info['school_id_no'] == ag.real_id]['school_name'].values[0]
-                                    if not school_info[school_info['school_id_no'] == ag.real_id].empty else f"School {ag.real_id}"
-                                }
+                                sname = school_info[school_info['school_id_no'] == ag.real_id]['school_name'].values[0] if not school_info[school_info['school_id_no'] == ag.real_id].empty else None
+                                if sname:
+                                    sim_state[sname.strip()] = {
+                                        'RCSI': ag.running_total_outcome,
+                                        'milestone': ag.current_milestone,
+                                        'school_name': sname
+                                    }
+                                    sim_names.append(sname.strip())
 
-                            # Color by milestone
                             milestone_colors = {0: 'red', 1: 'orange', 2: 'yellow', 3: 'green',
                                                4: 'lightblue', 5: 'blue', 6: 'purple'}
 
-                            for _, row in coord_df.iterrows():
-                                sid = int(row['school_id_no'])
-                                if sid in sim_state:
-                                    state = sim_state[sid]
-                                    lat, lon = row['latitude'], row['longitude']
+                            matched = 0
+                            for school_name, (lat, lon) in name_to_coord.items():
+                                if school_name in sim_state:
+                                    state = sim_state[school_name]
                                     color = milestone_colors.get(state['milestone'], 'gray')
                                     popup_text = f"""
                                     <b>{state['school_name']}</b><br>
@@ -580,12 +672,19 @@ def app():
                                         popup=folium.Popup(popup_text, max_width=250),
                                         icon=folium.Icon(color=color, icon='info-sign')
                                     ).add_to(school_map)
+                                    matched += 1
 
                             st_folium(school_map, width=700, height=500)
                             st.caption("Marker colors: Red=M0, Orange=M1, Yellow=M2, Green=M3, "
                                        "Light blue=M4, Blue=M5, Purple=M6")
-                    elif show_div_data and coord_df is None:
-                        st.info("Upload the school coordinates CSV (in Step 1) to view the map.")
+                            st.write(f"**Schools displayed on map:** {matched} out of {len(name_to_coord)} coordinate entries.")
+                            if matched == 0:
+                                st.warning(
+                                    "No schools could be matched. The school names in the coordinates file "
+                                    "do not match any school name in the simulation data. "
+                                    f"\n\nFirst 5 coordinate names: {list(name_to_coord.keys())[:5]}"
+                                    f"\nFirst 5 simulation names: {sim_names[:5]}"
+                                )
 
                     # Sensitivity
                     sensitivity_info = ""
