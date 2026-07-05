@@ -525,12 +525,16 @@ def app():
                             st.info("Select at least 2 schools for comparison.")
 
                     # --- NEW: Division School Map (only for Division Head) ---
+                    st.write("✅ Map code block reached")
                     if show_div_data and coord_df is not None:
                         with st.expander("📍 Division School Map"):
                             # Center map on mean of coordinates
                             map_center = [coord_df['latitude'].mean(), coord_df['longitude'].mean()]
                             school_map = folium.Map(location=map_center, zoom_start=12)
-
+                        if show_div_data and coord_df is not None:
+                            st.write("✅ Condition true – building map")
+                            with st.expander("📍 Division School Map"):
+                            ...
                             # Build simulation state lookup
                             sim_state = {}
                             for agent in st.session_state.sim.agents:
