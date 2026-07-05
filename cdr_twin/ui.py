@@ -11,7 +11,7 @@ import base64
 import time
 from typing import List, Optional
 
-# --- NEW: folium for interactive map ---
+# --- folium for interactive map ---
 import folium
 from streamlit_folium import st_folium
 
@@ -158,7 +158,7 @@ def app():
             survey_file = st.file_uploader("Upload quarterly survey (CSV)", type=["csv"], key="survey")
         with col2:
             metadata_file = st.file_uploader("Upload research metadata (CSV)", type=["csv"], key="metadata")
-        # --- NEW: coordinates file uploader ---
+        # School coordinates (optional)
         coord_file = st.file_uploader("School Coordinates CSV (optional)", type=["csv"], key="coordinates")
         st.markdown("---")
         st.markdown("**Need templates?**")
@@ -182,7 +182,7 @@ def app():
         survey_df, school_info, survey_error = process_survey(survey_df_raw)
         metadata_df, meta_error = process_metadata(metadata_df_raw)
 
-        # --- NEW: Process coordinates file ---
+        # Process coordinates file
         if coord_file is not None:
             coord_df_raw = pd.read_csv(coord_file)
             if not {'school_id_no', 'latitude', 'longitude'}.issubset(coord_df_raw.columns):
@@ -318,8 +318,7 @@ def app():
                     </div>
                     """, unsafe_allow_html=True)
 
-                # ---- NEW: Division Baseline Synopsis (if Division Head) ----
-                st.write(f"DEBUG: show_div_data={show_div_data}, coord_df is None={coord_df is None}, coord_file={coord_file}")
+                # Division Baseline Synopsis (if Division Head)
                 if show_div_data:
                     if 'division_baseline_synopsis' not in st.session_state:
                         with st.spinner("Generating division baseline synopsis..."):
@@ -524,25 +523,23 @@ def app():
                         else:
                             st.info("Select at least 2 schools for comparison.")
 
-                    # --- NEW: Division School Map (only for Division Head) ---
-                    st.write("✅ Map code block reached")
+                    # ---------------------------
+                    # Division School Map (only for Division Head)
+                    # ---------------------------
                     if show_div_data and coord_df is not None:
                         with st.expander("📍 Division School Map"):
                             # Center map on mean of coordinates
                             map_center = [coord_df['latitude'].mean(), coord_df['longitude'].mean()]
                             school_map = folium.Map(location=map_center, zoom_start=12)
-                        if show_div_data and coord_df is not None:
-                            st.write("✅ Condition true – building map")
-                            with st.expander("📍 Division School Map"):
-                            ...
+
                             # Build simulation state lookup
                             sim_state = {}
-                            for agent in st.session_state.sim.agents:
-                                sim_state[agent.real_id] = {
-                                    'RCSI': agent.running_total_outcome,
-                                    'milestone': agent.current_milestone,
-                                    'school_name': school_info[school_info['school_id_no'] == agent.real_id]['school_name'].values[0]
-                                    if not school_info[school_info['school_id_no'] == agent.real_id].empty else f"School {agent.real_id}"
+                            for ag in st.session_state.sim.agents:
+                                sim_state[ag.real_id] = {
+                                    'RCSI': ag.running_total_outcome,
+                                    'milestone': ag.current_milestone,
+                                    'school_name': school_info[school_info['school_id_no'] == ag.real_id]['school_name'].values[0]
+                                    if not school_info[school_info['school_id_no'] == ag.real_id].empty else f"School {ag.real_id}"
                                 }
 
                             # Color by milestone
