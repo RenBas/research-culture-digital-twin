@@ -182,11 +182,14 @@ def app():
         survey_df, school_info, survey_error = process_survey(survey_df_raw)
         metadata_df, meta_error = process_metadata(metadata_df_raw)
 
-        # Process coordinates file
+        # Process coordinates file (robust version)
         if coord_file is not None:
             coord_df_raw = pd.read_csv(coord_file)
-            if not {'school_id_no', 'latitude', 'longitude'}.issubset(coord_df_raw.columns):
-                st.error("Coordinates file must contain columns: school_id_no, latitude, longitude")
+            # Normalise column names: strip spaces, lowercase
+            coord_df_raw.columns = [c.strip().lower() for c in coord_df_raw.columns]
+            required = {'school_id_no', 'latitude', 'longitude'}
+            if not required.issubset(coord_df_raw.columns):
+                st.error(f"Coordinates file must contain columns: school_id_no, latitude, longitude. Found: {', '.join(coord_df_raw.columns.tolist())}")
                 coord_df = None
             else:
                 coord_df = coord_df_raw[['school_id_no', 'latitude', 'longitude']].dropna()
